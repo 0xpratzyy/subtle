@@ -11,6 +11,7 @@ import {Filmstrip} from './Filmstrip';
 import {Drawer, TweakControls, WordList} from './Tweak';
 import {How} from './Sections';
 import {RefsFooter, RefsUpsell} from './RefsFooter';
+import {Dither} from './Dither';
 import {Icon, pad, useMedia} from './ui';
 import {headlineFace} from './face';
 
@@ -310,6 +311,7 @@ export default function App() {
         <RefsUpsell />
       </main>
 
+      <div className="dz-sep" aria-hidden="true"><Dither shape="band" reach={1} max={0.5} /></div>
       <RefsFooter />
 
       {/* mobile sticky bar */}

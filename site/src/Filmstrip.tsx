@@ -1,6 +1,7 @@
 import React, {memo, useState} from 'react';
 import {FILTERS, PRESETS, isBehind, stylesFor, CATEGORY} from './data';
 import {Icon, Reveal} from './ui';
+import {Dither} from './Dither';
 
 const CATNAME: Record<string, string> = {bold: 'Bold', elegant: 'Editorial', minimal: 'Minimal'};
 
@@ -39,6 +40,7 @@ export const Filmstrip = memo(function Filmstrip({names, active, filter, setFilt
   const tw = new Set(tweakedSet ? tweakedSet.split(',') : []);
   return (
     <section id="styles" className="strip-sec" aria-label="Caption styles">
+      <Dither shape="down" reach={1} max={0.55} className="dz dz-strip" />
       <Reveal className="strip-head">
         <div>
           <h2>35 ways to caption one clip.</h2>

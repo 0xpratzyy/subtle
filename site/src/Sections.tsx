@@ -1,6 +1,7 @@
 import React, {memo, useState} from 'react';
 import {CATEGORY, INSTALL, PRESETS, REPO, SPEECH_ORDER, isBehind} from './data';
 import {Icon, Reveal, pad} from './ui';
+import {Dither} from './Dither';
 
 const CATNAME: Record<string, string> = {bold: 'Bold', elegant: 'Editorial', minimal: 'Minimal'};
 const SHOWCASE = ['cover', 'keyword', 'outline', 'numeral'];
@@ -73,11 +74,13 @@ export function How({copied, doCopy}: {copied: string; doCopy: (id: string, t: s
   const cmd = codex ? INSTALL.codex : INSTALL.claude;
   return (
     <section id="how" className="how">
+      <Dither shape="radial" x={0.92} y={0.12} reach={0.42} max={0.75} className="dz dz-how" />
       <Reveal className="sec-head">
         <h2>Three steps. No upload, no key.</h2>
       </Reveal>
       <ol>
         <Reveal as="li" delay={0}>
+          <Dither shape="radial" x={1} y={0} reach={0.55} max={0.85} cell={6} className="dz dz-card" />
           <span className="n">01</span>
           <h3>Install it</h3>
           <p>Clone Subtle into your agent's skills folder. One line.</p>
@@ -96,12 +99,14 @@ export function How({copied, doCopy}: {copied: string; doCopy: (id: string, t: s
           </div>
         </Reveal>
         <Reveal as="li" delay={90}>
+          <Dither shape="radial" x={1} y={0} reach={0.55} max={0.85} cell={6} className="dz dz-card" />
           <span className="n">02</span>
           <h3>Point Claude at your video</h3>
           <p>It transcribes on your Mac, groups the words and picks the highlights.</p>
           <div className="term quote"><div className="term-line"><code><span className="ps">&gt;</span> add captions to ~/Movies/talk.mp4</code></div></div>
         </Reveal>
         <Reveal as="li" delay={180}>
+          <Dither shape="radial" x={1} y={0} reach={0.55} max={0.85} cell={6} className="dz dz-card" />
           <span className="n">03</span>
           <h3>Pick a style</h3>
           <p>Choose one here, tweak it, and hit <b>Copy prompt</b>. Paste it into Claude Code and you get the finished video, the .srt and an editable captions file.</p>

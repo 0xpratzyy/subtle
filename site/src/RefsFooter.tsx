@@ -1,5 +1,6 @@
 import {useEffect, useRef} from 'react';
 import './refs-footer.css';
+import {Dither} from './Dither';
 
 /* The Refs site footer, ported from refs.video (web/src/components/footer.tsx): the site's links laid out as clips on a
    V1/A1 edit timeline, a playhead drifting across that lights the clip under it; hover, focus or a drag on the ruler
@@ -157,6 +158,8 @@ export function RefsUpsell() {
   return (
     <section className="upsell" aria-labelledby="up-h">
       <div className="up-in">
+        <Dither shape="radial" x={0.02} y={1} reach={0.5} max={0.8} className="dz dz-up-l" />
+        <Dither shape="radial" x={0.98} y={1} reach={0.5} max={0.8} className="dz dz-up-r" />
         <div className="reel" aria-label="Films from the Refs library">
           <ReelRow films={FILMS.slice(0, 6)} />
           <ReelRow films={FILMS.slice(6)} reverse />
