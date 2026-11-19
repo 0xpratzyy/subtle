@@ -14,6 +14,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from cuts import clamp_pages, split_pages  # noqa: E402
 from emphasis import MODES, SENTENCE_END, WEAK_END, bare, finalise, rule_picks, split_words  # noqa: E402
 from spoken_numbers import normalise_numbers  # noqa: E402
 
@@ -150,7 +151,7 @@ def snap_to_beats(pages, beats, mode, hold, frame):
     return pages
 
 
-def group_pages(words, page_cfg, fps, wide, beats=None):
+def group_pages(words, page_cfg, fps, wide, beats=None, cuts=None):
     max_words = int(page_cfg.get("maxWords", 3))
     max_lines = int(page_cfg.get("maxLines", 1))
     per_line = int(page_cfg.get("maxCharsPerLineWide" if wide else "maxCharsPerLine", 30 if wide else 18))
@@ -219,6 +220,10 @@ def group_pages(words, page_cfg, fps, wide, beats=None):
                 nx.insert(0, c.pop())
         pages.extend(c for c in chunks if c)
 
+    # 2b. Hard cuts: a page never straddles one. Split at the cut; a tiny remainder joins a neighbour of the same shot.
+    if cuts and page_cfg.get("unit") != "line":
+        pages = split_pages(pages, cuts, min_ms, max_words, max_chars)
+
     # Line mode (music styles): a page is one lyric line, or a block of `linesPerPage` lines. Lines come from the
     # lyrics file when there is one (lyricLine), else from the phrases and chunks above.
     line_mode = page_cfg.get("unit") == "line"
@@ -284,6 +289,8 @@ def group_pages(words, page_cfg, fps, wide, beats=None):
         })
     if beats and page_cfg.get("snap") in ("beat", "bar"):
         snap_to_beats(out, beats, page_cfg["snap"], bool(page_cfg.get("hold")), frame)
+    if cuts:
+        clamp_pages(out, cuts, fps)
     return out
 
 
@@ -316,6 +323,7 @@ def main():
     ap.add_argument("--no-auto-emphasis", action="store_true", help="same as --emphasis off")
     ap.add_argument("--numbers", default="auto", choices=["auto", "western", "indian", "off"],
                     help="rewrite spoken numbers as one token ($5,000, 40%%, ₹5 lakh); digit grouping: auto, western or indian; off keeps the transcript")
+    ap.add_argument("--cuts", help="cuts.json from scripts/cuts.py ({\"cuts\": [ms, ...]}) or a comma-separated list of ms: pages never straddle a cut")
     ap.add_argument("--beats", help="beats.json from scripts/beats.py: music styles start pages on the beat")
     ap.add_argument("--replace", action="append", default=[], help="heard=Shown spelling fix, e.g. refs=Refs (repeatable)")
     ap.add_argument("--clean", action="store_true", help="drop filler words (um, uh)")
@@ -338,7 +346,14 @@ def main():
     if not words:
         sys.exit("group.py: no words in " + a.words)
     beats = json.load(open(a.beats)) if a.beats else None
-    pages = group_pages(words, page_cfg, fps, wide, beats)
+    cuts = []
+    if a.cuts:
+        raw = open(a.cuts).read() if Path(a.cuts).exists() else a.cuts
+        try:
+            cuts = sorted({int(c) for c in (json.loads(raw)["cuts"] if raw.lstrip().startswith("{") else raw.split(",")) if str(c).strip()})
+        except (ValueError, KeyError):
+            sys.exit("group.py: --cuts must be a cuts.json file or a comma-separated list of milliseconds")
+    pages = group_pages(words, page_cfg, fps, wide, beats, cuts)
     mode, forced = a.emphasis, split_words(a.emphasis_words)
     if mode not in MODES:  # older calls passed the words here: --emphasis "gold,three" meant only these words
         forced, mode = forced + split_words(mode), "off"
@@ -354,7 +369,10 @@ def main():
     }
     if beats and beats.get("times"):
         out["beats"] = {"bpm": beats.get("bpm"), "times": beats["times"], "downbeats": beats.get("downbeats", [])}
+    if cuts:
+        out["cuts"] = cuts
     finalise(out, style)  # emphasised pages hold a beat longer; styles with a giant word get their `big` list
+    clamp_pages(pages, cuts, fps)  # the longer hold must not run past a cut either
     json.dump(out, open(a.out, "w"), ensure_ascii=False, indent=1)
     if a.srt:
         open(a.srt, "w").write(to_srt(pages, style.get("case")))

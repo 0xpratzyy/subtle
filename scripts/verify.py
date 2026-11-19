@@ -96,7 +96,12 @@ def main():
     warnings, frames = [], []
     L, T, R, B = safe_box(W, H)
     # text inside a container (pill, chip, block) or with an outline is readable on any footage
-    protected = bool((style.get("stroke") or {}).get("width", 0) >= 0.3 or style.get("box") or style.get("container"))
+    protected = bool((style.get("stroke") or {}).get("width", 0) >= 0.3 or style.get("box") or style.get("container")
+                     or (style.get("recipe") or {}).get("plate") or ((style.get("recipe") or {}).get("stroke") or {}).get("width", 0) >= 0.04)
+
+    # automatic help (halo, scrim, stroke, plate) was measured and drawn for pages that needed it: see scripts/legibility.py
+    helped = bool(cap.get("legibility")) and ((style.get("legibility") or {}).get("mode", "halo") != "none")
+    protected = protected or helped
 
     picks = sorted({0, len(pages) // 4, len(pages) // 2, (3 * len(pages)) // 4, len(pages) - 1})
     for pi in picks:

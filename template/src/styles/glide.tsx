@@ -1,5 +1,5 @@
 import React from 'react';
-import {Word, emphasisOf, hasNumeral, Xf, dropShadow, joinFilters, fadeIn, fadeOut, f30, scaleFromBaseline, styleShadow} from '../engine';
+import {Word, emphasisOf, hasNumeral, Xf, dropShadow, joinFilters, fadeIn, fadeOut, f30, scaleFromBaseline, styleShadow, withAlpha} from '../engine';
 import type {PageProps, StyleDef} from '../engine';
 
 // Emphasis words in a large calligraphic script, filler words small and bold, all on one baseline.
@@ -9,11 +9,13 @@ const Page: React.FC<PageProps> = ({st, f, page, L, ws, left}) => {
   const a = st.anim;
   const script = scriptIndexes(page);
   const out = fadeOut(left, f30(a.pageOut ?? 2, f.fps));
-  const glow = joinFilters(
-    dropShadow(f, 0, 0, a.glowBlur ?? 8, a.glowColor ?? 'rgba(245,242,88,0.55)'),
-    dropShadow(f, 0, 0, (a.glowBlur ?? 8) * 3, 'rgba(245,242,88,0.22)'),
-  );
   const sh = styleShadow(st, f);
+  const glow = joinFilters(
+    dropShadow(f, 0, 0, a.glowBlur ?? 8, a.glowColor ?? withAlpha(st.activeColor!, 0.4)),
+    dropShadow(f, 0, 0, (a.glowBlur ?? 8) * 3, withAlpha(st.activeColor!, 0.16)),
+    sh,
+  );
+  const bold = a.scriptBold ?? 0; // the script is hairline thin: a few extra copies a fraction of a pixel apart thicken it
   return (
     <Xf opacity={out}>
       {L.words.map((box, i) => {
@@ -21,14 +23,12 @@ const Page: React.FC<PageProps> = ({st, f, page, L, ws, left}) => {
         const isScript = script.has(i);
         const r = isScript ? scaleFromBaseline(since, f30(a.scriptIn ?? 5, f.fps), a.scriptFrom ?? 0.1) : fadeIn(since, f30(a.wordIn ?? 2, f.fps));
         return (
-          <Word
-            key={i}
-            box={box}
-            fill={isScript ? st.activeColor! : st.color}
-            opacity={r.opacity}
-            scale={r.scale}
-            filter={isScript ? glow : sh}
-          />
+          <g key={i}>
+            {isScript && bold > 0
+              ? [-1, 1].map((k) => <Word key={k} box={box} fill={st.activeColor!} opacity={r.opacity} scale={r.scale} dx={k * bold * (f.H / 1080) * 0.5} filter={glow} />)
+              : null}
+            <Word box={box} fill={isScript ? st.activeColor! : st.color} opacity={r.opacity} scale={r.scale} filter={isScript ? glow : sh} />
+          </g>
         );
       })}
     </Xf>

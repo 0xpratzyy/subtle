@@ -213,21 +213,33 @@ def big_words(pages, behind_cfg, duration_ms):
             return 0
         return 1 if r in RULE_REASONS else 2
 
+    kinds = behind_cfg.get("kinds")  # optional: only these kinds of word go big ("number", "name", "word")
+    numbers_behind = bool(behind_cfg.get("numbersBehind"))  # a style built for numerals draws them behind too
+    min_words = int(behind_cfg.get("minWords", 1))
+
+    def kind_of(group):
+        if any(number_kind(g["text"]) for g in group):
+            return "number"
+        return "name" if any((g.get("reason") or "").startswith("name") for g in group) else "word"
+
+    def clean(g):
+        return re.sub(r"^[^\w$₹€£]+|[^\w%]+$", "", g["text"])
+
     cands = []
     i = 0
     while i < len(flat):
         w = flat[i]
         if w.get("emphasis"):
             group = [w]
-            if max_big > 1 and i + 1 < len(flat) and flat[i + 1].get("emphasis") and \
-                    len(bare(w["text"])) + len(bare(flat[i + 1]["text"])) + 1 <= max_chars:
+            while len(group) < max_big and i + 1 < len(flat) and flat[i + 1].get("emphasis") and \
+                    len(" ".join(bare(g["text"]) for g in group + [flat[i + 1]])) <= max_chars:
                 group.append(flat[i + 1])
                 i += 1
-            text = " ".join(re.sub(r"^[^\w$₹€£]+|[^\w%]+$", "", g["text"]) for g in group)
-            if text and len(text) <= max_chars:
+            text = " ".join(clean(g) for g in group)
+            if text and len(text) <= max_chars and len(group) >= min_words and (not kinds or kind_of(group) in kinds):
                 start = group[0]["startMs"]
                 b = {"text": text, "startMs": start, "endMs": max(group[-1]["endMs"], start + min_hold)}
-                if any(number_kind(g["text"]) for g in group):
+                if any(number_kind(g["text"]) for g in group) and not numbers_behind:
                     b["front"] = True  # a number must stay fully readable: drawn in front of the speaker, never behind
                 cands.append((max(rank(g) for g in group), b))
         i += 1
@@ -260,6 +272,11 @@ def finalise(cap, style):
     behind = (style or {}).get("behind") or {}
     if behind.get("enabled"):
         cap["big"] = big_words(pages, behind, dur)
+        try:
+            from shots import mark_bigs  # per-shot subject data (scripts/shots.py), when the captions carry it
+            mark_bigs(cap)
+        except ImportError:
+            pass
     return cap
 
 

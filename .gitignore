@@ -12,3 +12,8 @@ template/build/
 .DS_Store
 __pycache__/
 *.pyc
+scripts/vision-subject/.build/
+
+# showcase demo media (third-party clip): not in the repo
+site/public/demo/
+site/public/og.jpg

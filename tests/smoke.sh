@@ -8,6 +8,8 @@ trap 'rm -rf "$TMP"' EXIT
 python3 "$ROOT/tests/test_group.py"
 python3 "$ROOT/tests/test_emphasis.py"
 python3 "$ROOT/tests/test_music.py"
+python3 "$ROOT/tests/test_placement.py"
+python3 "$ROOT/tests/test_legibility.py"
 count=0
 for json in "$ROOT"/styles/*.json; do
   style="$(basename "$json" .json)"

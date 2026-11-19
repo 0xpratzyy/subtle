@@ -21,12 +21,15 @@
   "lineHeight": 1.2,
   "letterSpacing": 0,
   "color": "#FFFFFF",
-  "activeColor": "#F5F258",
+  "activeColor": {
+    "auto": "accent",
+    "fallback": "#F5F258"
+  },
   "shadow": {
     "x": 0,
-    "y": 0.19,
-    "blur": 0.37,
-    "color": "rgba(0,0,0,0.35)"
+    "y": 0.22,
+    "blur": 0.5,
+    "color": "rgba(0,0,0,0.5)"
   },
   "emphasis": {
     "numberFont": {
@@ -51,14 +54,19 @@
   },
   "anim": {
     "type": "glide",
-    "scriptScale": 2.8,
+    "scriptScale": 3.1,
     "scriptFrom": 0.1,
     "scriptIn": 5,
     "wordIn": 2,
     "pageOut": 2,
-    "glowBlur": 8
+    "glowBlur": 5,
+    "scriptBold": 0.9
   },
   "behind": {
     "enabled": false
+  },
+  "legibility": {
+    "mode": "halo",
+    "max": 1
   }
 }

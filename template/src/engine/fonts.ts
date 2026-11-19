@@ -28,6 +28,7 @@ export const GLYPH_GAPS: Record<string, {missing: string; fallback: FontSpec}> =
   'AbrilFatface-Regular.ttf': {missing: '₹', fallback: {family: 'Playfair Display Black Italic', file: 'PlayfairDisplay-BlackItalic.ttf', weight: 900}},
   'Corben-Bold.ttf': {missing: '₹', fallback: {family: 'Playfair Display Black Italic', file: 'PlayfairDisplay-BlackItalic.ttf', weight: 900}},
   'GloriaHallelujah-Regular.ttf': {missing: '₹', fallback: {family: 'Caveat SemiBold', file: 'Caveat-SemiBold.ttf', weight: 600}},
+  'LibreBaskerville-wght.ttf': {missing: '₹', fallback: PLAYFAIR_ITALIC},
   'ReenieBeanie-Regular.ttf': {missing: '₹', fallback: {family: 'Caveat SemiBold', file: 'Caveat-SemiBold.ttf', weight: 600}},
 };
 
@@ -44,7 +45,10 @@ export async function loadFonts(style: Style) {
     specs.map(async (f) => {
       const key = `${f.family}|${f.file}`;
       if (loaded.has(key)) return;
-      const face = new FontFace(f.family, `url(${staticFile(f.file)})`, {weight: String(f.weight)});
+      // A variable font (file name holds `wght`) is registered with its whole weight range, so the CSS weight picks the
+      // instance; with a single weight the browser keeps the font's default (lightest) instance.
+      const weight = /wght/.test(f.file) ? '100 900' : String(f.weight);
+      const face = new FontFace(f.family, `url(${staticFile(f.file)})`, {weight});
       await face.load();
       document.fonts.add(face);
       loaded.add(key);

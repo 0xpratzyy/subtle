@@ -11,11 +11,14 @@
     "weight": 900
   },
   "case": "sentence",
-  "size": 6.0,
+  "size": 6.4,
   "wideScale": 1.2,
   "lineHeight": 1.2,
   "letterSpacing": -0.01,
-  "color": "#05B2FA",
+  "color": {
+    "auto": "accent2",
+    "fallback": "#05B2FA"
+  },
   "shadow": null,
   "position": {
     "y": 60,
@@ -40,9 +43,13 @@
     "glowBlur": 18,
     "wordIn": 2,
     "pageOut": 3,
-    "shadowBlur": 22
+    "shadowBlur": 26
   },
   "behind": {
     "enabled": false
+  },
+  "legibility": {
+    "mode": "halo",
+    "max": 1
   }
 }

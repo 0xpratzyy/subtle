@@ -7,8 +7,12 @@ video.mp4
   └─ scripts/transcribe.py   → words.json      (mlx-whisper, word timestamps, cached by file hash)
   └─ scripts/lyrics.py       → words.json      (optional, --lyrics: the lyrics file's words on the transcript's timings)
   └─ scripts/beats.py        → beats.json      (music styles only: tempo, beats, bar starts; ffmpeg + numpy, cached)
-  └─ scripts/group.py        → captions.json   (number tokens, pages, lines, rule-picked highlights; needs a style)
+  └─ scripts/cuts.py         → cuts.json       (ffmpeg scene score: hard cuts, flashes ignored; ffmpeg only)
+  └─ scripts/group.py        → captions.json   (number tokens, pages, lines, rule-picked highlights; pages split at cuts; needs a style)
+  └─ scripts/placement.py    → captions.json   (adds pages[].y: off the face and hands; scripts/vision-subject, Apple Vision)
   └─ scripts/emphasis.py     → captions.json   (optional: Claude or the user changes the highlights; refreshes holds and giant words)
+  └─ scripts/legibility.py   → captions.json   (per-page background measurement, `legibility` + `palette`; numpy, runs through uv)
+  └─ scripts/shots.py        → captions.json   (behind styles and `split`: per-shot subject data `shots` and a 400 ms `subject` timeline; marks giant words that do not fit behind as `front`)
   └─ scripts/vision-matte    → check JSON, matte.mp4   (behind mode only; Apple Vision)
   └─ template/render.mjs     → overlay.mov     (Remotion: transparent caption layer, ProRes 4444)
   └─ scripts/composite.sh    → <name>.captioned.mp4   (ffmpeg: video + text [+ matted person])
@@ -49,9 +53,10 @@ fifth input, the blur mask (`--layer mask`): the source is blurred under it befo
   "version": 1,
   "video": { "width": 720, "height": 1280, "fps": 24, "durationMs": 8041 },
   "style": "glide",
+  "cuts": [4042, 7542],
   "pages": [
     {
-      "startMs": 0, "endMs": 1260,
+      "startMs": 0, "endMs": 1260, "y": 74,
       "words": [
         { "text": "India", "startMs": 0,    "endMs": 780,  "line": 0, "emphasis": false },
         { "text": "has",   "startMs": 780,  "endMs": 1020, "line": 0, "emphasis": false },
@@ -63,15 +68,70 @@ fifth input, the blur mask (`--layer mask`): the source is blurred under it befo
 }
 ```
 
+- `legibility`, `legibilitySummary` and `palette` are written by `scripts/legibility.py`, see "Legibility and palette" below.
 - A page is what is on screen at once. `line` is 0 or 1 (max 2 lines).
 - Pages never overlap. A page ends when the next one starts, or at most 400 ms after its last word (700 ms when the page
   has a highlighted word, so it holds a beat longer where there is room).
+- `cuts` (optional) lists the hard cuts of the picture in ms, each the first frame of the new shot. No page straddles one:
+  `group.py` splits a page at a cut (a word belongs to the shot holding its midpoint), joins a tiny split-off piece to a
+  neighbouring page of the same shot when there is room, and clips a page's start and end to its shot. Absent when there
+  are none, when `--cuts off` is used, and for music styles.
+- `pages[i].y` (optional) is where page *i* sits, in percent of the frame height, set by `scripts/placement.py`. The renderer
+  uses it instead of the style's `position.y` for that page (every style, through `pageStyle` in `engine/layout.ts`).
+  A page without `y` sits at the style's `position.y`. Edit it freely; a `--captions` file that already has `y` is not re-placed.
 - `emphasis` marks the highlighted words; `reason` says in one line why that word was picked (`price`, `year`, `name`,
   or whatever Claude or the user wrote). At most 1 per page, 2 on pages of 5 words or more.
 - A word's `text` may hold a whole amount with a space in it (`"₹1 lakh"`, `"$5 million"`). It is still one word: one
   box in the layout, never split across lines or pages.
 - `big` exists only for styles with `behind.enabled`: the 1 to 2 word beats drawn large behind the person. Text is stored
   as spoken; the renderer applies the style's case.
+
+## Legibility and palette
+
+Footage decides whether thin, light type reads. `scripts/legibility.py` (run by `subtle.py` after grouping, before the render; `--legibility off`
+and `--palette off` skip the two halves) measures the footage and writes three keys into `captions.json`:
+
+```json
+"legibility": [ { "page": 0, "contrast": 2.78, "busy": 0.78, "bg": "#83725C", "boost": 0.83 } ],
+"legibilitySummary": { "mode": "halo", "pages": 9, "boosted": 9, "meanBoost": 0.82, "maxBoost": 0.87, "minContrast": 2.4, "meanBusy": 0.77 },
+"palette": { "accent": "#FFF599", "accent2": "#9FD8FF", "ink": "#FFFEF8", "shade": "#17110A", "bg": "#826F59", "contrast": 8.0 }
+```
+
+**Measure.** For each page it reads 3 frames across the page's time and looks at the region the text will cover, estimated from the preset
+(`position`, `size`, `lineHeight`, the page's line count and character count, `marginX`; not a render). `contrast` is the WCAG ratio between the
+ink (`color`, and the accent colour when the page has a highlight; words not yet spoken at `anim.dim` opacity) and the part of the background that is hardest
+for it (the brightest quarter under light ink, the darkest under dark ink). `busy` (0..1) is mean edge strength and spread of the luminance, which
+film grain does not saturate. `bg` is the mean colour. `boost` (0..1) is how much help the page needs: the target contrast is 4.5:1 on a calm
+background rising to 10.5:1 on a very busy one, and `boost` is the shortfall on a scale that reaches 1 at 1.2:1 (0 for white on a calm dark background).
+For a `plate` style the ink is measured against the plate over the footage. `boost` is 0 for `none` styles.
+
+**Draw.** `template/src/engine/legibility.tsx` turns `boost` into help in the style's own taste. A preset may declare
+
+```json
+"legibility": { "mode": "halo", "max": 1, "strength": 1 }
+```
+
+| `mode` | What is drawn | Default for |
+|---|---|---|
+| `halo` | layered soft shadows hugging the glyphs, in the scene's `palette.shade` (a warm near-black on a warm room) | any preset with no `container` |
+| `scrim` | a feathered band across the frame behind the caption block, soft top and bottom, at most 55% dark | (`terminal`) |
+| `stroke` | a thin outline round the glyphs (SVG dilate), width grows with `boost` | |
+| `plate` | the style's own container gets darker: the style calls `plateFill(fill, useLegibility())` (`glass`) | |
+| `none` | nothing: boxed or full-frame styles that carry their own background | any preset with a `container` |
+
+`max` caps `boost` for that style (a delicate style asks for less), `strength` scales the effect; `"accent": false` leaves the highlight colour out of the contrast measurement (`terminal`: its highlight is dark text on its own green block). Below a boost of 0.04 nothing is drawn, so on clean footage the
+render is identical to a render without the feature. Nothing is drawn in `mask` mode or in the `behind` layer. A variant can set its own mode
+(`singalong:lit` is `halo`, the plain `singalong` has its own field and is `none`).
+
+**Palette.** Any colour in a preset may be a token, `{ "auto": "accent" | "accent2" | "ink" | "shade", "fallback": "#rrggbb" }`. The renderer replaces it with
+`captions.palette[...]`, or with the fallback when the file has no palette (`--palette off`, or a hand-written file). Tokens are used in `glide` (`activeColor`),
+`keyword` (`emphasis.color`, `behind.bigColor`), `shine` (`color`, the contrasting `accent2`), `accent` (`color`), `hype` (`activeColor`), `highlighter`, `haiku` and `karaoke` (`emphasis.color`).
+`legibility.py` picks the palette by k-means (k = 6, fixed seed) on 8 downsampled frames: the dominant hue of the saturated clusters, then candidate accents at that hue,
+about 20 degrees either side and at the split-complement, at four saturations, always at full brightness. Each candidate is scored on contrast against the
+background as it looks under the halo (the caption-zone luminance, 75th percentile page, darkened by `SHIELD` = 65%), harmony with the scene, vibrancy and distance from the wall's own
+hue; the winner is paled toward white until it reaches 4.5:1 where the scene allows it (it never ends below 3:1, the WCAG limit for large text). `accent2` is the best candidate at the split-complement or opposite hue (a cooler second colour), paled the same way. `ink` is a
+near-white tinted toward the accent, `shade` a near-black tinted toward the scene hue, `bg` the measured caption-zone colour, `contrast` the accent's ratio.
+Colours the preset fixes in place (a style's identity, e.g. terminal green) are not tokens and never change.
 
 ## Music: beats, lyrics and line pages
 
@@ -171,16 +231,19 @@ Optional keys a style may use (the engine loads every `{family, file, weight}` o
 | `noteFont` | handwriting font for a note line |
 | `activeColor`, `dimColor` | accent colour; colour of words not yet spoken |
 | `position.x` | horizontal centre in % of width (default 50); `position.marginX` is the side margin in % |
+| `position.flex` | `[low, high]`: the range (% of height) placement may move a page's centre within; `0` fixes the style at `position.y`. Absent: `[y - 12, y + 12]`, with the top end kept above 84 (or at `y` if that is lower). The preset `y` is always inside the range. `chalkline`, `downbeat`, `billboard`, `singalong`, `keyword` and every music style keep their own place whatever this says |
 | `container` | `{kind: pill \| chip \| block, fill, highlight, padX, padY, radius}`; padding in em of the font size |
 | `backdropBlur` | px at 1080p to blur the video under the container (`--layer mask` carries the shape); 0 or absent for none |
 | `anim.*` | timings (frames at 30 fps), scales and offsets read by that style's component |
 | `behind` | giant words behind the speaker, see below |
+| `legibility` | `{mode, max, strength}`: automatic help on busy footage, see "Legibility and palette" |
+| `{auto, fallback}` | any colour may be a token filled from `captions.palette`, see "Legibility and palette" |
 
 `anim` keys are private to each style. The ones the bundled styles read (frames are at 30 fps; sizes in em of the font size unless noted):
 
 | Style | `anim` keys |
 |---|---|
-| `glide` | `scriptScale` (script word size against the sans), `scriptIn`, `scriptFrom` (start scale), `wordIn`, `glowBlur`, `pageOut` |
+| `glide` | `scriptScale` (script word size against the sans), `scriptBold` (px at 1080p: extra copies of the hairline script, thickens it), `scriptIn`, `scriptFrom` (start scale), `wordIn`, `glowBlur`, `pageOut` |
 | `glass`, `karaoke`, `chip` | `dim` (opacity of words not yet spoken), `wordIn`, `pageIn`, `pageOut`, `pageScaleFrom` |
 | `whisper` | `wipe` (frames per word), `feather` (soft edge, em), `wordBlur`, `pageBlur`, `pageOut` |
 | `terminal` | `cps` (characters a second), `blink` (cursor period) |
@@ -197,7 +260,7 @@ Optional keys a style may use (the engine loads every `{family, file, weight}` o
 | `sticker` | none (the bubble is `container`: `fill`, `padX`, `height`, `radius`, `offset` of each line to the right of the one above; the stack tilts 0.4° to 3° by page) |
 | `ticket` | none (the label is `container`: `fill`, `padX`, `padY`; the tilt cycles through −3° to +4° by page and segment) |
 | `highlighter` | `padX`, `padY` (box padding, em), `gap` (word spacing multiplier), `handoff` (frames the box takes to hop) |
-| `haiku` | none: one word per page, hard cuts |
+| `haiku` | `stroke` (dark outline, em of the word), `bold` (thickening stroke in its own colour, em): one word per page, hard cuts |
 | `duo` | `leadFont`, `tailFont`, `leadSize`, `tailSize` (% of height), `leadTrack` (letter spacing, em), `softColor`, `leadIn`, `tailIn`, `pageOut` |
 | `editorial` | `rowGap`, `afterGap` (baseline distance of the lines above and below the keyword, in sans sizes), `keyInset`, `keyIn` (frames), `keyFrom` (start scale), `keyBlur` |
 | `downbeat` | `inFrames` (entry length), `moves` (entry move per line, cycled: `spin` `up` `down` `left` `wipe`), `stagger` (frames between the lines of a page), `fills` (line width as a share of the frame, cycled), `maxSize`, `connectorSize` (% of height), `fields` (`{bg, fg}` list, cycled), `fieldBars` (bars per colour field), `fieldPages` (pages per field without beats), `accentField` (field index for a page with an emphasised word); top-level `lineFonts` is the font list lines take in turn. Vertical frames (`*Tall` keys): `fillsTall`, `maxSizeTall`, `maxWidthTall` (line width limit), `gapTall` (line gap factor), `maxStackTall` / `minStackTall` (stack height share, max / min), `maxStretchTall` (the full-size lines are stretched taller to reach `minStackTall`), `connectorSizeTall`, `connectorFillTall`, `condensedTall` (`lineFonts` indexes an emphasised line takes) |
@@ -222,6 +285,56 @@ third of the frame under `bigY`) and at most `frontWidth`% of the frame wide. Ha
 move any word to the front or back.
 The giant word fills `bigWidth`% of the frame width (never larger than `bigMaxSize`% of the height).
 
+## Recipe styles (`anim.type: "recipe"`)
+
+`template/src/styles/recipe.tsx` is one generic style driven entirely by a `recipe` block in the style JSON, so a caption
+treatment needs no new TSX. All top-level keys stay as in any style (`font`,
+`case`, `size`, `color`, `shadow`, `position`, `page`, `backdropBlur`...); `group.py` reads `page` and `case` as usual.
+Lengths are in **em** of the font size, frames are at 30 fps (scaled to the video's fps), every key is optional.
+
+```json
+"anim": {"type": "recipe"},
+"recipe": {
+  "unit": "word", "enter": {"kind": "pop", "frames": 6, "ease": "out-back", "overshoot": 1.12},
+  "exit": {"kind": "cut"}, "upcoming": {"opacity": 0}, "active": {"color": "#C8FF2E", "scale": 1.1},
+  "stroke": {"width": 0.08, "color": "#000"}, "emphasis": {"color": "#C8FF2E"}
+}
+```
+
+| Key | Default | Meaning |
+|---|---|---|
+| `unit` | `word` | What animates in: `word` (each word as it is spoken), `line` (each line when its first word is spoken), `page` (the whole page at page start). |
+| `enter.kind` | `fade` | `none` `fade` `pop` (scale up with overshoot) `rise` (from below) `drop` (from above) `slide-left` (moves left, starts right) `slide-right` `wipe` (soft left-to-right reveal) `blur-in` `typewriter` (characters of the unit in order) `scale-down` (starts large, settles). |
+| `enter.frames` | 6 | Length of the entrance. |
+| `enter.ease` | `out-cubic` | `out-cubic` `out-back` `out-expo` `linear` (`typewriter` is always linear). |
+| `enter.distance` | 0.4 | Travel in em for `rise` `drop` `slide-*`; blur radius scale for `blur-in`; extra start scale for `scale-down` (0.4 = starts at 1.4x). |
+| `enter.overshoot` | 1.12 | Peak scale of `pop` (start scale is 0.6, `1` means no overshoot). |
+| `enter.stagger` | 0 | Frames between successive words of a `line` / `page` unit (and of a `word` unit when `upcoming.opacity` > 0). |
+| `exit.kind` | `cut` | How the page leaves, over its last frames: `cut` `fade` `drop` `rise` `blur-out` `scale-up`. |
+| `exit.frames` | 4 | Length of the exit. |
+| `upcoming.opacity` | 0 | Opacity of a word that is on screen but not yet spoken. **Above 0.01 the whole page (or line) enters at the page start and unspoken words sit at this opacity** (karaoke look). At 0, `word` units appear only when spoken; for `line` / `page` units 0 means "no dimming" (treated as 1). |
+| `upcoming.color` | `null` (= `color`) | Colour of an unspoken word. |
+| `active.color` | `null` | Colour of the word being spoken. |
+| `active.scale` | 1 | Scale of the spoken word (about its centre; 3-frame blend in and out). |
+| `active.opacity` | 1 | Opacity of the spoken word. |
+| `active.plate` | `null` | `{color, radius, padX, padY}` (em) box behind the spoken word (a hopping highlighter). Defaults: `rgba(255,255,255,0.9)`, 0.2, 0.2, 0.1. |
+| `active.underline` | `null` | `{color, thickness, offset}` (em; defaults text colour, 0.07, 0.14) line under the spoken word, growing as it is spoken. |
+| `spoken.color`, `spoken.opacity` | `null`, 1 | Look of a word after it was spoken. |
+| `plate` | `null` | A plate behind the text: `{kind: page \| line \| word, color, radius, padX, padY, backdropBlur}` (em, except `backdropBlur` in px at 1080p). Defaults `rgba(0,0,0,0.6)`, 0.3, 0.4, 0.15, 0. `page` = one card for the block, `line` = one per line, `word` = one per word. `backdropBlur` blurs the video under the plate (same mask pipeline as `glass`; it is read from here, or from the top-level `backdropBlur`). The block is kept `padX` clear of the side margins. |
+| `stroke` | `null` | `{width, color}` outline, `width` in em as the **visible** outer thickness. |
+| `emphasis.color` | `null` | Colour of words with `emphasis: true`; wins over the state colours. |
+| `emphasis.scale` | 1 | Size multiplier in the layout (the line grows around it). |
+| `emphasis.font` | `null` | A `{family, file, weight}` from `fonts/` for emphasis words. |
+| `emphasis.plate`, `emphasis.underline` | `null` | Same shapes as `active.plate` / `active.underline`, shown for emphasis words as soon as they enter. |
+| `emphasis.case` | `null` | `upper` `lower` `sentence` for emphasis words (default: the style `case`). |
+| `align` | `center` | `center` `left` `right`: line alignment inside the block; `position.x` is the centre of the block. |
+| `rotate` | 0 | Degrees, the whole block about its centre. |
+| `uppercaseEmphasisOnly` | false | Words keep their typed case, emphasis words are upper-cased. |
+
+Precedence of a word's colour: `emphasis.color`, then the state colour (`active` / `spoken` / `upcoming`), then `color`.
+Draw order, back to front: page and line plates, word plates, underlines, text (with `stroke`); the style's `shadow` is applied
+to the text only. Bundled examples: `newsroom`, `cards`, `punch`, `quiet`.
+
 ## Renderer CLI (`template/render.mjs`)
 
 ```
@@ -240,7 +353,8 @@ node template/render.mjs ... --frames 24-72                    # only that frame
 ## Renderer code (`template/src/`)
 
 ```
-engine/   types, ease, time (page timing, per-word state), layout (measure, wrap, fit), draw (words, containers, reveals), fonts
+engine/   types, ease, time (page timing, per-word state), layout (measure, wrap, fit), draw (words, containers, reveals), fonts,
+          legibility (halo / scrim / stroke / plate from captions.legibility, palette tokens)
 styles/   one file per style + index.ts (the registry)
 Captions.tsx   picks the style from the registry, lays out each page, calls the style's components
 ```
@@ -370,3 +484,69 @@ would be behind them); or the soft-edge fraction is above 8%.
 
 `matte` writes a video with the same frame count, size and frame rate as the source: white is the person, black is the
 background, soft edges are kept. It prints one JSON line with `frames`, `msPerFrame` and `quality`.
+
+## Cuts and placement
+
+Two steps keep captions out of the way of the picture. Both run before the render and write into `captions.json`.
+
+**Cuts** (`scripts/cuts.py`, ffmpeg only). `ffmpeg select='gt(scene,..)'` on a 320 px copy gives a score per frame. A cut needs a
+score of at least 0.30 (`THRESHOLD`: jump cuts on the same person scored 0.34 to 0.42, new scenes 0.5 to 0.95, gestures and
+turns under 0.2). Two cuts closer than 220 ms are a flash or a whip pan and are both dropped; of two cuts closer than 350 ms
+the stronger stays; a "cut" in the first 350 ms is the video starting. Times are snapped to the frame grid and cached in
+`<work>/cuts.json`. Flag `--cuts off` skips it. `python3 scripts/cuts.py video.mp4 [--threshold 0.3]` prints the list.
+
+**Placement** (`scripts/placement.py`, `scripts/vision-subject`). Per page it looks at three frames (15%, 50%, 85% of the page) and at
+the first frames of each shot, asks `vision-subject` for faces, hands and the person's share of each horizontal band, and
+picks the y inside the style's `position.flex` range with the lowest cost:
+
+```
+cost(y) = 100 * conflict + 0.25 * busy + 0.01 * |y - ref|
+conflict = mean over samples of 3 * (share of the caption box covered by a face box) + 2 * (same for hand boxes)
+           face boxes grow 2.5% / 3.5% (x / y) of the frame, hand boxes 3% / 4% (the product in the hand)
+busy     = share of the box's rows the person fills (the emptier band reads better)
+ref      = the previous page's y inside a shot, the style's y at a cut
+```
+
+The caption box is approximated from the style (size, line count, character count, container padding; `stack` and `sticker` have
+their own rules). Stability: a page keeps the previous page's y while it is still clear (under 1% of its box covered), so
+captions move only when the subject moves under them; at a cut the position is decided again from the preset. `y` is
+rounded to half a percent. Flag `--placement off` skips it. Without macOS, Xcode command line tools or a readable picture
+(a song on a black canvas, music styles) every page keeps the style's y and `notes` says so. Results are cached next to the
+transcript, in `~/.cache/subtle/<sha256>/subject.v1.json` (`SUBTLE_CACHE` moves it).
+
+### vision-subject CLI (`scripts/vision-subject/`)
+
+```
+scripts/vision-subject/build.sh                                 # swiftc → scripts/vision-subject/.build/vision-subject
+vision-subject sample <video> --times 0.5,1.2,3 [--bands 24]    # or --times-file <file>; JSON on stdout
+```
+
+```json
+{ "bands": 24, "frames": [ { "t": 0.5, "faces": [[0.25, 0.26, 0.54, 0.30]], "hands": [[0.82, 0.67, 0.17, 0.25]], "person": [0.0, 0.1, "…24 values"] } ] }
+```
+
+Boxes are `[x, y, w, h]` as fractions of the upright frame, origin top left. `faces` come from `VNDetectFaceRectanglesRequest`,
+`hands` from `VNDetectHumanHandPoseRequest` (the bounds of the confident joints, up to four hands), `person` from
+`VNGeneratePersonSegmentationRequest` (balanced): per band, the share of the width the person covers. macOS 13+, Apple
+frameworks only.
+
+## Behind the speaker, per shot (`scripts/shots.py`)
+
+A close-up fills the frame, so a word behind the speaker would be hidden; a wide shot leaves room. The decision is per shot (the spans between
+`cuts`), not for the video. `shots.py` (macOS, vision-subject, the same cached samples as `placement.py`) writes two keys into `captions.json`:
+
+```json
+"shots":   [ {"startMs": 0, "endMs": 23700, "person": 1.0, "bands": [0, 0.01, 0.22, ...24], "face": [0.35, 0.18, 0.31, 0.17], "behind": true, "y": 16.0, "cover": 0.3} ],
+"subject": [ {"ms": 0, "bands": [...24], "face": [x, y, w, h]}, ... ]
+```
+
+`bands` is the share of each horizontal band the person covers. A shot is `behind: true` when a window the height of the style's word (`behind.bandHeight`,
+fraction of the frame) can sit where the person covers `behind.target` (default 0.3) of it, covers at most 45% on average and 55% in any row. Otherwise
+the shot's giant words get `front: true` and `close: true` (`emphasis.py` repeats this whenever it rebuilds `big`). `subject` is the same data every 400 ms: a style places
+each word where the person is while it is up (`subjectIn`, `behindY`, `shoulderY`, `placeX` in `template/src/engine/shots.ts` and `styles/behind-kit.ts`).
+Styles read `BigProps.layer` (`all` means no cut-out: draw in front) and `behind.skipFront` (a word that cannot go behind is not drawn; it stays in the small line).
+Extra `behind` keys: `bandHeight`, `target`, `overlap` (share of the word the head covers), `kinds` (`number`, `name`, `word`), `numbersBehind`, `minWords`; `maxBigWords` may be 3.
+A front style that places words around the face (`split`) sets top-level `"subject": true` to get the same data.
+
+New styles: `cover`, `outline`, `poster`, `rise`, `numeral` (behind); `magazine`, `flip`, `cinema` (recipe), `split` (front). `template/stills.mjs` renders many stills with one bundle and
+`tests/styles_sheet.py` builds the contact sheet (three layers and the person cut-out stacked like `composite.sh`).

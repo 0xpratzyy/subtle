@@ -43,5 +43,9 @@
   },
   "behind": {
     "enabled": false
+  },
+  "legibility": {
+    "mode": "halo",
+    "max": 0.6
   }
 }

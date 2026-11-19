@@ -8,3 +8,5 @@ export * from './api';
 export * from './emphasis';
 export * from './captions-extra';
 export * from './beats';
+export * from './legibility';
+export * from './shots';

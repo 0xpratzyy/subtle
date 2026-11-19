@@ -84,5 +84,8 @@
   },
   "behind": {
     "enabled": false
+  },
+  "legibility": {
+    "mode": "none"
   }
 }

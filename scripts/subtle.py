@@ -59,6 +59,13 @@ def last_json(text):
     return {}
 
 
+def has_auto(obj):
+    """True when a style takes colours from the footage: a {"auto": ..., "fallback": ...} token anywhere in it."""
+    if isinstance(obj, dict):
+        return isinstance(obj.get("auto"), str) or any(has_auto(v) for v in obj.values())
+    return isinstance(obj, list) and any(has_auto(v) for v in obj)
+
+
 def py(script):
     """Run a script that needs packages through uv when it is there, else plain python3."""
     if shutil.which("uv"):
@@ -77,6 +84,15 @@ def probe_size(path):
     return w, h
 
 
+def probe_fps(path):
+    out = run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=r_frame_rate", "-of", "csv=p=0", path]).strip()
+    n, _, d = out.partition("/")
+    try:
+        return float(n) / float(d or 1)
+    except (ValueError, ZeroDivisionError):
+        return 30.0
+
+
 def main():
     ap = argparse.ArgumentParser(description="Add animated captions to a video.")
     ap.add_argument("video", nargs="?")
@@ -87,6 +103,10 @@ def main():
     ap.add_argument("--list-styles", action="store_true", help="print the available styles and exit")
     ap.add_argument("--behind", choices=["auto", "on", "off"], default="auto",
                     help="auto: put the big words behind the speaker when the style supports it (keyword) and the subject check passes; on: force it; off: never")
+    ap.add_argument("--placement", choices=["auto", "off"], default="auto",
+                    help="auto: move each page off the face and the hands, within the style's position.flex range (macOS, Apple Vision); off: every page keeps the style's y")
+    ap.add_argument("--cuts", choices=["auto", "off"], default="auto",
+                    help="auto: find hard cuts with ffmpeg so no caption page straddles one; off: ignore cuts")
     ap.add_argument("--lang", help="spoken language code (default: detect)")
     ap.add_argument("--vocab", default="", help="names and brand words, comma-separated")
     ap.add_argument("--script", choices=["native", "roman"], default="native", help="roman: Hindi in Latin letters")
@@ -105,6 +125,10 @@ def main():
     ap.add_argument("--out", help="output video path")
     ap.add_argument("--work", help="work folder (default: .subtle/<name> next to the video)")
     ap.add_argument("--stop-after", choices=["transcribe", "group"])
+    ap.add_argument("--palette", choices=["auto", "off"], default="auto",
+                    help="auto: styles whose accent colour is {auto: ...} take it from the footage (a colour that suits the scene and reads on it); off: the preset's colours")
+    ap.add_argument("--legibility", choices=["auto", "off"], default="auto",
+                    help="auto: measure the background behind every page and add a halo, scrim or outline where the text would not read; off: draw the preset as it is")
     ap.add_argument("--matte-quality", choices=["accurate", "balanced", "fast"], default="accurate")
     ap.add_argument("--crf", default="18")
     a = ap.parse_args()
@@ -248,6 +272,23 @@ def main():
             else:
                 notes.append(f"behind mode skipped: {check.get('reason', 'subject check failed')}; the big words are drawn in front of the speaker instead")
 
+    # ---- hard cuts: pages must not straddle them ----
+    cuts_path = work / "cuts.json"
+    cuts = []
+    if not a.captions and not music and not audio_only and a.cuts == "auto":
+        stamp = [video.name, video.stat().st_size, int(video.stat().st_mtime)]
+        cached = json.loads(cuts_path.read_text()) if cuts_path.exists() else {}
+        if cached.get("stamp") != stamp:
+            with step("cuts"):
+                found = last_json(run([sys.executable, HERE / "cuts.py", video, "--fps", str(probe_fps(video))]))
+                if found.get("error"):
+                    notes.append(f"cut detection skipped: {found['error']}")
+                cached = {"stamp": stamp, "cuts": found.get("cuts", [])}
+                cuts_path.write_text(json.dumps(cached))
+        cuts = cached.get("cuts", [])
+        if cuts:
+            notes.append(f"{len(cuts)} hard cut(s) found: pages are split at them")
+
     # ---- group ----
     cap_path = work / "captions.json"
     srt_path = src.with_name(src.stem + ".srt")
@@ -266,6 +307,8 @@ def main():
                 notes.append(f"beat grid: {bt['bpm']} BPM, {bt.get('beats')} beats (pulse clarity {bt.get('clarity')})")
             else:
                 notes.append("no steady beat found in the audio: pages follow the words, not a beat grid")
+        if cuts:
+            cmd += ["--cuts", cuts_path]
         if a.max_words:
             cmd += ["--max-words", a.max_words]
         cmd += ["--emphasis", a.emphasis, "--numbers", a.numbers]
@@ -277,9 +320,62 @@ def main():
             cmd += ["--clean"]
         with step("group"):
             run(cmd)
+    # ---- placement: keep each page off the face and the hands ----
+    placement = None
+    if a.placement == "auto" and not audio_only and not music:
+        cap = json.loads(cap_path.read_text())
+        if a.captions and any("y" in p for p in cap["pages"]):
+            notes.append("placement: the given captions already carry page positions (y); kept as they are")
+        else:
+            import placement as pl
+            with step("placement"):
+                if pl.ensure_tool() is None:
+                    notes.append("placement needs macOS with the Xcode command line tools (vision-subject); every page keeps the style's y")
+                else:
+                    try:
+                        pnotes, placement = pl.apply(video, cap, style, cap.get("cuts") or [])
+                        notes += pnotes
+                        cap_path.write_text(json.dumps(cap, ensure_ascii=False, indent=1))
+                        if placement.get("pages"):
+                            notes.append(f"placement: {placement['moved']} of {placement['pages']} pages moved off the preset y ({placement['changes']} position changes)")
+                    except (RuntimeError, OSError) as e:
+                        notes.append(f"placement skipped ({e}); every page keeps the style's y")
+    # ---- behind mode, per shot: a close-up fills the frame, a wide shot leaves room. Decided for each shot, not once for the video ----
+    needs_subject = bool(style.get("subject"))  # a front style that places words around the face (split) reads the same timeline
+    if ((wants_behind and a.behind != "off") or needs_subject) and not music and not audio_only and sys.platform == "darwin":
+        cap = json.loads(cap_path.read_text())
+        if cap.get("cuts") or cap.get("shots") or needs_subject:
+            import shots as sh
+            with step("shots"):
+                try:
+                    if cap.get("shots"):
+                        sh.mark_bigs(cap)
+                        snotes = []
+                    else:
+                        snotes, _ = sh.apply(video, cap, style)
+                    cap_path.write_text(json.dumps(cap, ensure_ascii=False, indent=1))
+                    notes += snotes
+                    if wants_behind and a.behind != "off":
+                        use_behind = a.behind == "on" or any(x.get("behind") for x in cap["shots"])
+                    if wants_behind and a.behind != "off" and not use_behind:
+                        notes.append("behind mode skipped: no shot leaves room behind the speaker; the big words are drawn in front")
+                except (RuntimeError, OSError) as e:
+                    notes.append(f"per-shot behind check skipped ({e})")
     user_cap = src.with_name(src.stem + ".captions.json")
     if cap_path.resolve() != user_cap.resolve():
         shutil.copyfile(cap_path, user_cap)
+    # ---- legibility: what is behind each page, and a palette from the footage (after grouping, before the render) ----
+    style_dict = json.loads(style_path.read_text())
+    if a.legibility != "off" or (a.palette != "off" and has_auto(style_dict)):
+        with step("legibility"):
+            lg = last_json(run(py(HERE / "legibility.py") + [cap_path, "--style", style_path, "--video", video,
+                                                           "--palette", a.palette, "--legibility", a.legibility]))
+        shutil.copyfile(cap_path, user_cap)
+        s_ = lg.get("legibility") or {}
+        if s_.get("pages"):
+            notes.append(f"legibility ({s_['mode']}): {s_['boosted']} of {s_['pages']} pages need help, mean boost {s_['meanBoost']}, weakest contrast {s_['minContrast']}:1")
+        if lg.get("palette"):
+            notes.append(f"palette from the footage: accent {lg['palette']['accent']} ({lg['palette']['contrast']}:1 on the scene)")
     cap = json.loads(cap_path.read_text())
     picks = [f"{i}: {w['text']}" + (f" ({w['reason']})" if w.get("reason") else "") for i, p in enumerate(cap["pages"]) for w in p["words"] if w.get("emphasis")]
     if a.stop_after == "group":
@@ -323,7 +419,7 @@ def main():
         comp = ["bash", HERE / "composite.sh", "--video", video, "--overlay", ov, "--out", out, "--crf", a.crf]
         with step("render"):
             run(render + ["--layer", "all", "--out", ov])
-            blur = float(style.get("backdropBlur") or 0)
+            blur = float(style.get("backdropBlur") or ((style.get("recipe") or {}).get("plate") or {}).get("backdropBlur") or 0)
             if blur > 0:  # frosted containers: the video is blurred under a mask of the containers
                 mask = work / "mask.mov"
                 run(render + ["--layer", "mask", "--out", mask])
@@ -340,7 +436,7 @@ def main():
     rerender = f"python3 {Path(__file__).name} \"{src.name}\" --style <other-style>   # reuses the cached transcript"
     print(json.dumps({
         "video": str(out), "captions": str(src.with_name(src.stem + '.captions.json')), "srt": str(srt_path) if srt_path.exists() else None,
-        "preview": str(preview) if preview.exists() else None, "style": style["name"], "behind": use_behind, "subjectCheck": check,
+        "preview": str(preview) if preview.exists() else None, "style": style["name"], "behind": use_behind, "subjectCheck": check, "placement": placement, "cuts": cuts,
         "ok": result.get("ok"), "warnings": result.get("warnings", []), "behindVisibility": result.get("behind"),
         "highlighted": picks,
         "notes": notes, "seconds": times, "totalSeconds": total, "secondsPerMinuteOfVideo": round(total / max(minutes, 1e-6), 1),

@@ -142,7 +142,7 @@ export function layoutPage(page: CPage, st: Style, f: Frame, o: LayoutOpts = {})
   const lh = fs * (st.lineHeight ?? 1.15);
   const capH = capHeight(st.font) * fs;
   const cx = (f.W * (o.x ?? st.position.x ?? 50)) / 100;
-  const cy = (f.H * (o.y ?? st.position.y)) / 100;
+  const cy = (f.H * (o.y ?? page.y ?? st.position.y)) / 100;
   const blockH = lh * lineIds.length;
   const blockW = widest(wordLine, m);
   const words: WordBox[] = [];
@@ -175,3 +175,6 @@ export function fitWord(text: string, font: FontSpec, widthPx: number, maxFs: nu
   const fs = Math.min(maxFs, (100 * widthPx) / w100);
   return {fs, w: textWidth(text, font, fs, ls)};
 }
+
+/** The style as it applies to one page: `position.y` replaced by the page's own y when placement set one. */
+export const pageStyle = (st: Style, page: CPage): Style => (page.y == null ? st : {...st, position: {...st.position, y: page.y}});

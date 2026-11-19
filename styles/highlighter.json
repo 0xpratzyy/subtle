@@ -24,7 +24,10 @@
     "color": "rgba(0,0,0,0.55)"
   },
   "emphasis": {
-    "color": "#45F715",
+    "color": {
+      "auto": "accent",
+      "fallback": "#45F715"
+    },
     "scale": 1.9
   },
   "position": {
@@ -50,5 +53,9 @@
   },
   "behind": {
     "enabled": false
+  },
+  "legibility": {
+    "mode": "halo",
+    "max": 1
   }
 }

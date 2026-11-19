@@ -6,22 +6,25 @@
     "remotion"
   ],
   "font": {
-    "family": "Montserrat Medium",
-    "file": "Montserrat-Medium.ttf",
-    "weight": 500
+    "family": "Montserrat Bold",
+    "file": "Montserrat-Bold.ttf",
+    "weight": 700
   },
   "case": "sentence",
-  "size": 3.9,
+  "size": 4.4,
   "wideScale": 1.2,
   "lineHeight": 1.2,
   "letterSpacing": 0,
   "color": "#FFFFFF",
-  "activeColor": "#FCD402",
+  "activeColor": {
+    "auto": "accent",
+    "fallback": "#FCD402"
+  },
   "shadow": {
     "x": 0,
     "y": 0.25,
-    "blur": 0.9,
-    "color": "rgba(0,0,0,0.75)"
+    "blur": 1.0,
+    "color": "rgba(0,0,0,0.8)"
   },
   "position": {
     "y": 47,
@@ -44,5 +47,9 @@
   },
   "behind": {
     "enabled": false
+  },
+  "legibility": {
+    "mode": "halo",
+    "max": 1
   }
 }

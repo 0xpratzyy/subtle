@@ -20,8 +20,14 @@ const Page: React.FC<PageProps> = ({st, f, page, t, frame}) => {
   const cy = (f.H * st.position.y) / 100;
   const cap = capHeight(font) * run.fs;
   return (
-    <g filter={styleShadow(st, f)} stroke="#1B1905" strokeWidth={run.fs * 0.045} paintOrder="stroke fill">
+    <g filter={styleShadow(st, f)} stroke="#1B1905" strokeWidth={run.fs * (st.anim.stroke ?? 0.045)} paintOrder="stroke fill">
       <LiningWord box={placeBox(run.boxes[0], cx - run.w / 2, cy + cap / 2)} fill={hot ? e.color ?? st.color : st.color} />
+      {/* the serif is hairline thin: the same word again with a thin stroke in its own colour thickens it */}
+      {st.anim.bold ? (
+        <g stroke={hot ? e.color ?? st.color : st.color} strokeWidth={run.fs * st.anim.bold} paintOrder="normal">
+          <LiningWord box={placeBox(run.boxes[0], cx - run.w / 2, cy + cap / 2)} fill={hot ? e.color ?? st.color : st.color} />
+        </g>
+      ) : null}
     </g>
   );
 };

@@ -23,7 +23,10 @@
     "color": "rgba(0,0,0,0.28)"
   },
   "emphasis": {
-    "color": "#D6FCA5"
+    "color": {
+      "auto": "accent",
+      "fallback": "#D6FCA5"
+    }
   },
   "position": {
     "y": 50,
@@ -55,7 +58,10 @@
     "bigWidth": 90,
     "bigMaxSize": 22,
     "bigOpacity": 1,
-    "bigColor": "#D6FCA5",
+    "bigColor": {
+      "auto": "accent",
+      "fallback": "#D6FCA5"
+    },
     "bigFont": {
       "family": "Inter Bold",
       "file": "Inter-Bold.ttf",
@@ -67,5 +73,9 @@
     "everyMs": 1700,
     "minGapMs": 150,
     "minVisible": 0.55
+  },
+  "legibility": {
+    "mode": "halo",
+    "max": 1
   }
 }

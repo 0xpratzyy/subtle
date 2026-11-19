@@ -11,7 +11,7 @@
     "weight": 400
   },
   "case": "sentence",
-  "size": 5.8,
+  "size": 6.8,
   "wideScale": 1.6,
   "lineHeight": 1.2,
   "letterSpacing": -0.02,
@@ -19,8 +19,8 @@
   "shadow": {
     "x": 0,
     "y": 0.15,
-    "blur": 0.9,
-    "color": "rgba(0,0,0,0.65)"
+    "blur": 1.0,
+    "color": "rgba(0,0,0,0.75)"
   },
   "emphasis": {
     "font": {
@@ -28,7 +28,10 @@
       "file": "InstrumentSerif-Italic.ttf",
       "weight": 400
     },
-    "color": "#FFF65A",
+    "color": {
+      "auto": "accent",
+      "fallback": "#FFF65A"
+    },
     "scale": 1.2
   },
   "position": {
@@ -46,9 +49,15 @@
     "maxCharsPerLineWide": 30
   },
   "anim": {
-    "type": "haiku"
+    "type": "haiku",
+    "stroke": 0.075,
+    "bold": 0.016
   },
   "behind": {
     "enabled": false
+  },
+  "legibility": {
+    "mode": "halo",
+    "max": 0.8
   }
 }

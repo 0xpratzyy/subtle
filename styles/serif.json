@@ -11,7 +11,7 @@
     "weight": 900
   },
   "case": "sentence",
-  "size": 6.0,
+  "size": 6.6,
   "wideScale": 1.2,
   "lineHeight": 1.2,
   "letterSpacing": -0.01,
@@ -37,14 +37,18 @@
   "anim": {
     "type": "serif",
     "gradTop": "#FFFFFF",
-    "gradBottom": "#8F8F8F",
+    "gradBottom": "#C4C4C4",
     "wordIn": 4,
     "wordBlur": 6,
     "pageOut": 4,
     "shadowBlur": 22,
-    "shadowColor": "rgba(0,0,0,0.78)"
+    "shadowColor": "rgba(0,0,0,0.85)"
   },
   "behind": {
     "enabled": false
+  },
+  "legibility": {
+    "mode": "halo",
+    "max": 1
   }
 }

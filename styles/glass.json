@@ -62,5 +62,9 @@
   },
   "behind": {
     "enabled": false
+  },
+  "legibility": {
+    "mode": "plate",
+    "max": 1
   }
 }

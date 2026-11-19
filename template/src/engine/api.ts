@@ -1,5 +1,5 @@
 import type React from 'react';
-import type {CBig, CPage, CaptionsFile, Frame, Style} from './types';
+import type {CBig, CPage, CaptionsFile, Frame, Layer, Style} from './types';
 import type {Layout, LayoutOpts, WordSpec} from './layout';
 import type {PageTiming, WordState} from './time';
 
@@ -17,9 +17,10 @@ export type PageProps = {
   ws: WordState[]; // per-word state: upcoming | active | spoken, progress, since
   mode: 'visible' | 'mask'; // mask = draw only solid white container shapes (backdrop blur mask)
   captions: CaptionsFile;
+  layer?: Layer; // which layer is being drawn: all (no cut-out: giant words sit in front), front or behind
 };
 
-export type BigProps = {st: Style; f: Frame; big: CBig[]; frame: number};
+export type BigProps = {st: Style; f: Frame; big: CBig[]; frame: number; captions?: CaptionsFile; layer?: Layer};
 
 /**
  * One style = one object like this, registered in styles/index.ts under `anim.type`.

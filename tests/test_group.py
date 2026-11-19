@@ -64,7 +64,8 @@ def main():
         style = json.loads((ROOT / "styles" / f"{name}.json").read_text())
         if (style.get("behind") or {}).get("enabled"):
             cap, _ = group(name, "--emphasis", "gold,three,won")
-            check(len(cap.get("big", [])) >= 2, f"{name}: expected at least two big words")
+            if not style["behind"].get("kinds") and not style["behind"].get("minWords"):  # numeral and poster only take numbers/names or phrases
+                check(len(cap.get("big", [])) >= 2, f"{name}: expected at least two big words")
             check(all(b["endMs"] - b["startMs"] >= 300 for b in cap.get("big", [])), f"{name}: a big word is on screen under 300 ms")
 
     if failures:

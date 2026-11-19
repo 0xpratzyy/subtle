@@ -25,6 +25,15 @@ import {downbeat} from './downbeat';
 import {singalong} from './singalong';
 import {chalkline} from './chalkline';
 import {billboard} from './billboard';
+import {recipe} from './recipe';
+import {cover} from './cover';
+import {outline} from './outline';
+import {poster} from './poster';
+import {rise} from './rise';
+import {magazine} from './magazine';
+import {flip} from './flip';
+import {numeral} from './numeral';
+import {split} from './split';
 
 /** Maps a style's `anim.type` (or its `name`) to the component that draws it. One line per style. */
 export const REGISTRY: Record<string, StyleDef> = {
@@ -54,4 +63,13 @@ export const REGISTRY: Record<string, StyleDef> = {
   singalong,
   chalkline,
   billboard,
+  recipe,
+  cover,
+  outline,
+  poster,
+  rise,
+  magazine,
+  flip,
+  numeral,
+  split,
 };

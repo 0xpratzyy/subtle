@@ -11,15 +11,15 @@
     "weight": 700
   },
   "case": "lower",
-  "size": 3.1,
+  "size": 3.9,
   "wideScale": 1.5,
   "lineHeight": 1.45,
   "letterSpacing": 0,
-  "color": "#27D65A",
-  "activeColor": "#27D65A",
+  "color": "#35E066",
+  "activeColor": "#35E066",
   "shadow": null,
   "emphasis": {
-    "fill": "#27D65A",
+    "fill": "#35E066",
     "color": "#06140A"
   },
   "position": {
@@ -42,5 +42,10 @@
   },
   "behind": {
     "enabled": false
+  },
+  "legibility": {
+    "mode": "scrim",
+    "max": 1,
+    "accent": false
   }
 }
