@@ -1,5 +1,6 @@
 import React, {useEffect, useImperativeHandle, useMemo, forwardRef, useRef, useState} from 'react';
 import {AbsoluteFill, Html5Audio, Html5Video, useVideoConfig} from 'remotion';
+import {track} from './analytics';
 import {Player, type PlayerRef} from '@remotion/player';
 import {Captions, loadFonts, type CaptionsFile, type Style} from './engine';
 
@@ -112,6 +113,14 @@ const Comp: React.FC<CompProps> = ({video, person, audio, captions, style, behin
   const cover: React.CSSProperties = {width: '100%', height: '100%', objectFit: 'cover'};
   const {width, height} = useVideoConfig();
   const packedRef = useRef<HTMLVideoElement | null>(null);
+  // A failed read or seek on the video (a dropped range request, a flaky connection) would otherwise throw and stop the
+  // player. Instead the same file is loaded again, up to 3 times, and Remotion seeks it back to the current frame.
+  const [retry, setRetry] = useState(0);
+  const again = (src?: string) => (src && retry ? `${src}?r=${retry}` : src);
+  const onMediaError = (e: Error) => {
+    track('subtle_video_error', {message: String(e?.message ?? e).slice(0, 160), retry});
+    setRetry((r) => (r < 3 ? r + 1 : r));
+  };
   // `person` is the packed video (picture | matte, side by side). With WebGL, both the picture and the cut-out are drawn
   // from that one video element, so they always show the same frame. Without WebGL: the plain clip, words in front.
   if (person && canCutout) {
@@ -119,8 +128,8 @@ const Comp: React.FC<CompProps> = ({video, person, audio, captions, style, behin
       <AbsoluteFill style={{background: '#000'}}>
         <Packed.Provider value={packedRef}>
           {/* the source: playing (Remotion keeps it in time, and its audio is the clip's), but never seen itself */}
-          <Html5Video ref={packedRef} src={person} playsInline style={{...cover, position: 'absolute', opacity: 0, pointerEvents: 'none'}} />
-          {audio && <Html5Audio src={audio} />}
+          <Html5Video ref={packedRef} src={again(person)} onError={onMediaError} playsInline style={{...cover, position: 'absolute', opacity: 0, pointerEvents: 'none'}} />
+          {audio && <Html5Audio src={again(audio)} onError={onMediaError} />}
           <GLLayer mode={0} w={width} h={height} />
           {behind ? (
             <>
@@ -137,8 +146,8 @@ const Comp: React.FC<CompProps> = ({video, person, audio, captions, style, behin
   }
   return (
     <AbsoluteFill style={{background: '#000'}}>
-      {video && <Html5Video src={video} style={cover} playsInline />}
-      {audio && <Html5Audio src={audio} />}
+      {video && <Html5Video src={again(video)} onError={onMediaError} style={cover} playsInline />}
+      {audio && <Html5Audio src={again(audio)} onError={onMediaError} />}
       <Captions key={style.name} captions={captions} style={style} layer="all" />
     </AbsoluteFill>
   );
