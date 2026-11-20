@@ -38,9 +38,9 @@ export function TweakControls(p: TweakProps) {
       <div className="tw-row">
         <span className="lab">Size</span>
         <div className="stepper">
-          <button className="round-btn" onClick={() => p.bump(-5)} aria-label="Smaller">−</button>
+          <button className="round-btn" onClick={() => p.bump(-10)} aria-label="Smaller">−</button>
           <output>{p.sizeNow}%</output>
-          <button className="round-btn" onClick={() => p.bump(5)} aria-label="Bigger">+</button>
+          <button className="round-btn" onClick={() => p.bump(10)} aria-label="Bigger">+</button>
         </div>
       </div>
 

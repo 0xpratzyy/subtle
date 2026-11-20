@@ -103,7 +103,7 @@ export function How({copied, doCopy}: {copied: string; doCopy: (id: string, t: s
           <span className="n">02</span>
           <h3>Point Claude at your video</h3>
           <p>It transcribes on your Mac, groups the words and picks the highlights.</p>
-          <div className="term quote"><div className="term-line"><code><span className="ps">&gt;</span> add captions to ~/Movies/talk.mp4</code></div></div>
+          <button type="button" className="term quote copyable" onClick={() => doCopy('ask', 'add captions to ~/Movies/talk.mp4')} aria-label="Copy the example request"><div className="term-line"><code><span className="ps">&gt;</span> add captions to ~/Movies/talk.mp4</code>{copied === 'ask' ? Icon.check : Icon.copy}</div></button>
         </Reveal>
         <Reveal as="li" delay={180}>
           <Dither shape="radial" x={1} y={0} reach={0.55} max={0.85} cell={6} className="dz dz-card" />

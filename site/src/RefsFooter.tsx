@@ -1,20 +1,21 @@
-import {useEffect, useRef} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import './refs-footer.css';
 import {Dither} from './Dither';
+import {ctaClick, refsUrl} from './analytics';
 
 /* The Refs site footer, ported from refs.video (web/src/components/footer.tsx): the site's links laid out as clips on a
    V1/A1 edit timeline, a playhead drifting across that lights the clip under it; hover, focus or a drag on the ruler
    takes it over. Links point at refs.video. */
 
 const R = 'https://refs.video';
-const FROM = '?from=subtle';
+const FROM = '?from=subtle&utm_source=subtle&utm_medium=page&utm_campaign=launch';
 const DUR = 44, DRIFT = 0.2, REST = 12.5;
 const timecode = (x: number) => { const t = Math.max(0, Math.round(x)), m = Math.floor((t % 3600) / 60), q = t % 60; return `${m < 10 ? '0' : ''}${m}:${q < 10 ? '0' : ''}${q}`; };
 const TICKS = Array.from({length: DUR + 1}, (_, s) => s);
 
 type Clip = {href: string; label: string; a: number; b: number; left: number; width: number; ext?: boolean};
 const V1: Clip[] = [
-  {href: `${R}/archive${FROM}`, label: 'Archive', a: 0, b: 13, left: 0, width: 29.5455},
+  {href: `${R}/archive`, label: 'Archive', a: 0, b: 13, left: 0, width: 29.5455},
   {href: `${R}/channels${FROM}`, label: 'Channels', a: 13, b: 25, left: 29.5455, width: 27.2727},
   {href: `${R}/connect${FROM}`, label: 'Add to Claude', a: 26.5, b: 36, left: 60.2273, width: 21.5909},
   {href: `${R}/pricing${FROM}`, label: 'Pricing', a: 36, b: 44, left: 81.8182, width: 18.1818},
@@ -172,10 +173,31 @@ export function RefsUpsell() {
           <li><b>MCP</b><span>for Claude Code, Codex, Cursor</span></li>
         </ul>
         <div className="up-cta">
-          <a className="pill primary big" href={`${R}${FROM}`}>Explore Refs</a>
-          <a className="pill ghost big" href={`${R}/connect${FROM}`}>Add Refs to Claude</a>
+          <a className="pill primary big" href={refsUrl('/')} onClick={() => ctaClick('footer')}>Explore Refs</a>
+          <a className="pill ghost big" href={refsUrl('/connect')} onClick={() => ctaClick('footer')}>Add Refs to Claude</a>
         </div>
       </div>
     </section>
+  );
+}
+
+
+/** The offer bar above the header, like refs.video's: Refs Pro's first year at 50% off (REFS50, applied at checkout with
+ *  no code) and a live countdown to when the offer ends. Gone once it has ended. */
+const OFFER_ENDS = Date.parse('2026-11-30T18:29:59Z'); // end of 30 Nov in India, as FIRST_YEAR_OFFER_UNTIL on refs.video
+export function OfferBar() {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
+  const left = OFFER_ENDS - now;
+  if (left <= 0) return null;
+  const d = Math.floor(left / 864e5), h = Math.floor(left / 36e5) % 24, m = Math.floor(left / 6e4) % 60, sec = Math.floor(left / 1e3) % 60;
+  const two = (n: number) => String(n).padStart(2, '0');
+  const clock = <span className="ob-clock" role="timer" aria-label={`${d} days ${h} hours ${m} minutes left`}>{d > 0 && <>{d}<i>d</i> </>}{two(h)}<i>:</i>{two(m)}<i>:</i>{two(sec)}</span>;
+  return (
+    <div className="ob">
+      <span className="long"><b>Refs</b>: launch films, broken down for Claude · Pro <b>50% off</b> · ends in {clock} ·</span>
+      <span className="short"><b>Refs</b> Pro <b>50% off</b> · {clock} ·</span>
+      <a href={refsUrl('/pricing') + '#yearly'} onClick={() => ctaClick('header')}>Claim →</a>
+    </div>
   );
 }

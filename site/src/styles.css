@@ -534,3 +534,24 @@ footer:not(.lf) { border-top: 1px solid var(--line); }
   html { scroll-behavior: auto; }
   .rv { opacity: 1; transform: none; }
 }
+
+/* Refs, more visible (dev, 2026-11-20): the header pill, the offer under the install buttons, the after-tweak link */
+.top nav a.refs-pill { color: var(--bg); background: var(--ink); border-color: var(--ink); font-weight: 600; }
+.top nav a.refs-pill:hover { color: var(--bg); opacity: .9; }
+@media (max-width: 760px) { .top nav a.refs-pill .dsk { display: none; } }
+.refs-offer { display: flex; align-items: center; gap: 14px; margin: 18px auto 0; max-width: 640px; padding: 14px 18px; border-radius: 24px;
+  border: 1px solid var(--line2); background: var(--card); color: var(--ink2); text-decoration: none; font-size: 14px; line-height: 1.45; text-align: left;
+  transition: border-color .15s, background .15s; }
+.refs-offer:hover { border-color: var(--ice); background: var(--card2); }
+.refs-offer b { color: var(--ink); font-weight: 600; }
+.refs-offer img { flex: none; opacity: .9; }
+.refs-offer .go, .refs-after .go { flex: none; color: var(--ice); font-weight: 600; white-space: nowrap; }
+.refs-after { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; padding: 12px 14px; border-radius: 18px;
+  border: 1px solid var(--line); background: var(--card2); color: var(--ink2); text-decoration: none; font-size: 13px; line-height: 1.4; }
+.refs-after:hover { border-color: var(--ice); }
+.term.copyable { display: block; width: 100%; padding: 0; text-align: left; cursor: pointer; font: inherit; color: inherit; }
+.term.copyable .term-line { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.term.copyable svg { flex: none; opacity: .6; }
+.term.copyable:hover svg { opacity: 1; }
+.phone { cursor: pointer; }
+@media (max-width: 600px) { .refs-offer { flex-direction: column; align-items: flex-start; gap: 10px; padding: 16px 18px; } .refs-offer img { display: none; } }

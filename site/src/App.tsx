@@ -1,5 +1,5 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import {track} from './analytics';
+import {ctaClick, refsUrl, track} from './analytics';
 import {loadFonts} from './engine';
 import {CATEGORY, CLIP, INSTALL, PRESETS, REPO, SPEECH_ORDER, isBehind, loadCaptions, stylesFor, type PackedCaptions} from './data';
 import {Stage, canCutout, type StageHandle} from './Stage';
@@ -11,7 +11,7 @@ import {Ambient} from './Ambient';
 import {Filmstrip} from './Filmstrip';
 import {Drawer, TweakControls, WordList} from './Tweak';
 import {How} from './Sections';
-import {RefsFooter, RefsUpsell} from './RefsFooter';
+import {OfferBar, RefsFooter, RefsUpsell} from './RefsFooter';
 import {Dither} from './Dither';
 import {Icon, pad, useMedia} from './ui';
 import {headlineFace} from './face';
@@ -82,6 +82,19 @@ export default function App() {
     });
     return () => (window as any).cancelIdleCallback?.(id);
   }, []);
+  // the styles either side load their fonts as soon as one is shown, so ← → (and the strip) switch at once; then the rest
+  useEffect(() => {
+    const i = Math.max(0, names.indexOf(styleName));
+    const near = [1, -1, 2, 3].map((d) => names[(i + d + names.length) % names.length]);
+    const t = setTimeout(() => {
+      (async () => {
+        for (const n of [...near, ...names.filter((n) => !near.includes(n))]) {
+          try { await loadFonts(PRESETS[n] as any); } catch {}
+        }
+      })();
+    }, 120);
+    return () => clearTimeout(t);
+  }, [styleName, names]);
   // the headline word changes face once its font is ready
   useEffect(() => {
     let live = true;
@@ -210,8 +223,9 @@ export default function App() {
 
   return (
     <>
+      <OfferBar />
       <header className="top">
-        <a className="brand" href="https://refs.video" aria-label="Refs">
+        <a className="brand" href={refsUrl('/')} aria-label="Refs" onClick={() => ctaClick('header', styleName)}>
           <img src="/brand/refs-symbol-white.svg" alt="" width="18" height="20" />
           <span>refs</span>
         </a>
@@ -250,7 +264,7 @@ export default function App() {
                 <button type="button" className="nav-arrow next" aria-label="Next style" onClick={() => step(1)}>
                   <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
                 </button>
-                <div className="phone">
+                <div className="phone" onClick={(e) => { if (!(e.target as HTMLElement).closest('button, a')) stage.current?.togglePlay(); }}>
                   <div className="bezel">
                     <div className="screen">
                       <img className="poster" src={CLIP.poster} alt="" />
@@ -345,3 +359,4 @@ export default function App() {
     </>
   );
 }
+

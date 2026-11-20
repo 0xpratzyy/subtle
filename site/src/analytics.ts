@@ -41,3 +41,24 @@ export function initAnalytics() {
   if (document.readyState === 'complete') idle();
   else addEventListener('load', idle, {once: true});
 }
+
+/** A refs.video link that says it came from Subtle. Archive pages take no extra query (the firewall checks /archive
+ *  with anything but a single tag=), so those carry only that; the referrer still names subtle.refs.video. */
+export function refsUrl(path = '/', tag?: string) {
+  if (path.startsWith('/archive')) return `https://refs.video/archive${tag ? `?tag=${tag}` : ''}`;
+  return `https://refs.video${path}?from=subtle&utm_source=subtle&utm_medium=page&utm_campaign=launch`;
+}
+export type CtaWhere = 'install_box' | 'after_tweak' | 'header' | 'footer';
+export const ctaClick = (where: CtaWhere, style?: string) => track('subtle_refs_cta_clicked', {where, ...(style ? {style} : {})});
+
+/** subtle_scrolled at 25, 50, 75 and 100% of the page, once each. */
+export function trackScrollDepth() {
+  const sent = new Set<number>();
+  const on = () => {
+    const h = document.documentElement;
+    const pct = ((h.scrollTop + innerHeight) / Math.max(1, h.scrollHeight)) * 100;
+    for (const d of [25, 50, 75, 100]) if (pct >= d - 0.5 && !sent.has(d)) { sent.add(d); track('subtle_scrolled', {depth: d}); }
+    if (sent.size === 4) removeEventListener('scroll', on);
+  };
+  addEventListener('scroll', on, {passive: true});
+}
