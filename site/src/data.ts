@@ -47,6 +47,6 @@ export function loadCaptions(): Promise<PackedCaptions> {
 
 export const REPO = 'github.com/0xpratzyy/subtle';
 export const INSTALL = {
-  claude: 'git clone https://github.com/0xpratzyy/subtle ~/.claude/skills/subtle',
-  codex: 'git clone https://github.com/0xpratzyy/subtle ~/.agents/skills/subtle',
+  claude: 'git clone --depth 1 https://github.com/0xpratzyy/subtle ~/.claude/skills/subtle',
+  codex: 'git clone --depth 1 https://github.com/0xpratzyy/subtle ~/.agents/skills/subtle',
 };
