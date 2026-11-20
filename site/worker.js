@@ -3,6 +3,17 @@
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    // PostHog through our own origin (src/analytics.ts), so ad blockers don't drop it; the visitor's IP goes along for geo
+    if (url.pathname.startsWith("/ingest/")) {
+      const host = url.pathname.startsWith("/ingest/static/") ? "us-assets.i.posthog.com" : "us.i.posthog.com";
+      const target = new URL(url.pathname.replace(/^\/ingest/, "") + url.search, `https://${host}`);
+      const headers = new Headers(request.headers);
+      headers.delete("cookie");
+      headers.set("host", host);
+      const ip = request.headers.get("cf-connecting-ip");
+      if (ip) headers.set("x-forwarded-for", ip);
+      return fetch(target, { method: request.method, headers, body: ["GET", "HEAD"].includes(request.method) ? undefined : request.body, redirect: "follow" });
+    }
     const range = request.headers.get("range");
     if (!range || !/\.(mp4|webm|mov|mp3|m4a)$/i.test(url.pathname)) return env.ASSETS.fetch(request);
     const res = await env.ASSETS.fetch(new Request(url.toString(), { method: "GET" }));

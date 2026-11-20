@@ -1,4 +1,5 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {track} from './analytics';
 import {loadFonts} from './engine';
 import {CATEGORY, CLIP, INSTALL, PRESETS, REPO, SPEECH_ORDER, isBehind, loadCaptions, stylesFor, type PackedCaptions} from './data';
 import {Stage, canCutout, type StageHandle} from './Stage';
@@ -28,6 +29,13 @@ export default function App() {
   const [styleName, setStyleName] = useState(init.style);
   const [filter, setFilter] = useState('top');
   const [tweaks, setTweaks] = useState<Tweaks>({});
+  // one event per style someone settles on (scrubbing through with the arrows sends only the last)
+  const firstStyle = useRef(true);
+  useEffect(() => {
+    if (firstStyle.current) { firstStyle.current = false; return; }
+    const t = setTimeout(() => track('subtle_style_viewed', {style: styleName}), 600);
+    return () => clearTimeout(t);
+  }, [styleName]);
   const [edits, setEdits] = useState<Record<string, Edits>>({});
   const [highlights, setHighlights] = useState(true);
   const [behindOn, setBehindOn] = useState(true);
@@ -143,10 +151,11 @@ export default function App() {
   const doCopy = async (id: string, text: string) => {
     const ok = await copyText(text);
     if (ok) { setCopied(id); setTimeout(() => setCopied((c) => (c === id ? '' : c)), 1700); }
+    track('subtle_copied', {what: id, style: styleName, tweaked: Object.keys(tweaks).length > 0, ok});
   };
   const promptText = () => buildPrompt({preset, tweaks: tw, highlights, behindOn: !canBehind || behindOn, edits: pageEdits, pages: base?.pages ?? []});
 
-  const setTw = (patch: Partial<Tweaks>) => setTweaks((m) => ({...m, ...patch}));
+  const setTw = (patch: Partial<Tweaks>) => { setTweaks((m) => ({...m, ...patch})); track('subtle_tweaked', {keys: Object.keys(patch), style: styleName}); };
   const bump = (d: number) => setTweaks((m) => ({...m, size: Math.max(60, Math.min(180, (m.size ?? 100) + d))}));
   const reset = () => {
     setTweaks({});

@@ -13,6 +13,7 @@
   "dependencies": {
     "@remotion/layout-utils": "4.0.534",
     "@remotion/player": "4.0.534",
+    "posthog-js": "1.438.12",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "remotion": "4.0.534"
