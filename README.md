@@ -26,6 +26,9 @@ Say "the gold price is five thousand dollars" and the caption shows **$5,000**, 
 - **Numbers are written the way you would write them.** "five thousand dollars" and "$5000" become `$5,000`; "forty
   percent" becomes `40%`; "one lakh rupees" becomes `₹1 lakh`; years stay `1991`. An amount is one token: it is never
   split across two lines or two pages. Indian digit grouping (`₹15,00,000`) is used for rupee amounts and Hindi speech.
+- **Spanish works the same way.** "cinco mil dólares" becomes `$5,000`, "cuarenta por ciento" becomes `40%`, "dos mil
+  veinticuatro" becomes `2024`, and the highlight rules use Spanish word lists. A transcript that already writes `5.000`
+  and `3,5` keeps that convention; `--numbers european` or `--numbers western` forces one.
 - **Every style has its own highlight**: a serif italic, a colour, an inverted chip, a second block colour, the giant
   word behind the speaker. A highlighted page also stays on screen a beat longer when there is room.
 - **It works with no one picking, too.** Rules find the numbers, names and contrast words (`--emphasis auto`, the
@@ -123,6 +126,7 @@ python3 scripts/subtle.py talk.mp4 --style ticket:yellow    # a colourway of a s
 python3 scripts/subtle.py talk.mp4 --style accent --emphasis-words 'gold, $5,000' --vocab "Meera, RBI"
 python3 scripts/subtle.py talk.mp4 --emphasis numbers       # highlight only numbers, prices, percentages and years
 python3 scripts/subtle.py talk.mp4 --hinglish               # Hindi written in Latin letters
+python3 scripts/subtle.py talk.mp4 --lang es                # Spanish (detected by itself when --lang is left out)
 python3 scripts/subtle.py talk.mp4 --aspect 9:16            # centre-crop first
 python3 scripts/subtle.py talk.mp4 --placement off --cuts off   # keep the style's own position, ignore cuts
 python3 scripts/subtle.py talk.mp4 --behind off             # draw giant words in front, never behind

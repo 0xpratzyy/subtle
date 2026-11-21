@@ -18,6 +18,7 @@ import argparse
 import json
 import re
 import sys
+from collections import namedtuple
 
 SENTENCE_END = re.compile(r"[.!?…]['\")\]]*$")
 # Words a page should not end on when the phrase continues (article + noun, preposition + noun, ...).
@@ -42,6 +43,54 @@ everyone thing things saying said going being having doing getting making becaus
 together another other others always maybe quite rather though although while where which their there these those
 people person today tomorrow yesterday""".split())
 MAX_HOLD_MS = 700  # an emphasised page may stay this long after its last word (plain pages: 400)
+
+# Spanish. Added to the lists above for Spanish speech only: "son", "sin", "con" and "once" are content words in English.
+_NO_ACCENT = str.maketrans("áéíóúü", "aeiouu")
+
+
+def _es(text):
+    """The words as written and without their accents: transcripts often drop them ("mas" for "más")."""
+    ws = set(text.split())
+    return ws | {w.translate(_NO_ACCENT) for w in ws}
+
+
+ES_WEAK_END = _es("""el la los las un una unos unas lo al del a de en con por para sin sobre entre hasta desde hacia tras
+según contra ante durante y e o u ni pero sino que si como porque aunque cuando mientras pues mi mis tu tus su sus nuestro
+nuestra nuestros nuestras este esta estos estas ese esa esos esas aquel aquella es son era eran fue soy eres somos está
+están estaba estoy he ha han hay no muy más tan me te se nos le les yo tú él ella nosotros ellos ellas usted ustedes""")
+ES_STOP = ES_WEAK_END | _es("""eso esto aquello ello qué quién quiénes cómo cuándo dónde cuál cuáles cuánto cuánta cuántos
+cuántas hace hacen hizo hago tiene tienen tengo tenía tuvo tenemos había hemos puede pueden puedo podía podría debe deben
+debería va van voy vamos iba ser estar haber sido estado será sería sea fueron estamos estás estaban estuvo también
+entonces ahora luego después antes ya aquí ahí allí allá acá algún alguna algunos algunas todo toda todos todas cada
+mucho mucha muchos muchas poco así""")
+ES_NUMBER_WORDS = _es("""dos tres cuatro cinco seis siete ocho nueve diez once doce veinte treinta cuarenta cincuenta sesenta
+setenta ochenta noventa cien ciento cientos docena docenas mil miles millón millones billón billones mitad doble triple
+cero""")
+ES_CONTRAST = _es("""nunca jamás nada nadie ninguno ninguna ningún gratis cero siempre peor mejor primero primera primer
+único única imposible prohibido prohibida ilegal secreto muerto muerta equivocado equivocada""")
+ES_NOT_NAMES = _es("""sí no ok okay hola bueno pues entonces pero y yo ahora quizás lunes martes miércoles jueves viernes
+sábado domingo""")
+ES_DULL = _es("""realmente básicamente literalmente simplemente obviamente algo alguien cualquier cualquiera cosa cosas
+diciendo dijo dice decir haciendo hacer siendo teniendo tener porque través antes después entre juntos junto otro otra
+otros otras quizá quizás bastante aunque mientras donde cual gente persona personas hoy mañana ayer bueno claro verdad
+digamos también entonces todavía además tampoco ahora siempre""")
+
+Lexicon = namedtuple("Lexicon", "weak_end stop number_words contrast not_names dull")
+DEFAULT_LEXICON = Lexicon(WEAK_END, STOP, NUMBER_WORDS, CONTRAST, NOT_NAMES, DULL)
+SPANISH_LEXICON = Lexicon(WEAK_END | ES_WEAK_END, STOP | ES_STOP, NUMBER_WORDS | ES_NUMBER_WORDS, CONTRAST | ES_CONTRAST,
+                          NOT_NAMES | ES_NOT_NAMES, DULL | ES_DULL)
+QUOTES = "\"'“‘(«"
+OPENERS = QUOTES + "¿¡"  # what may sit in front of a word's first letter
+
+
+def lexicon(language=None):
+    """The word lists for a transcript's language code ("es", "es-MX"): Spanish adds its own to the shared ones."""
+    return SPANISH_LEXICON if (language or "").lower().startswith("es") else DEFAULT_LEXICON
+
+
+def opens_sentence(text):
+    """True for a word that carries an opening ¿ or ¡: it starts a sentence, so its capital is not a name's."""
+    return text.lstrip(QUOTES)[:1] in ("¿", "¡")
 
 
 def bare(text):
@@ -69,7 +118,7 @@ def number_kind(text):
     return "number"
 
 
-def classify(words, i, names, starts=frozenset()):
+def classify(words, i, names, starts=frozenset(), lex=DEFAULT_LEXICON):
     """(score, reason) for words[i] in the flat word list. Higher scores win a page's one or two highlight slots."""
     text = words[i]["text"]
     b = bare(text)
@@ -78,27 +127,27 @@ def classify(words, i, names, starts=frozenset()):
     kind = number_kind(text)
     if kind:
         return {"price": 10, "percentage": 9.6, "year": 9.2, "number": 9}[kind], kind
-    if b in STOP and b not in CONTRAST:
+    if b in lex.stop and b not in lex.contrast:
         return 0, None
     letters = re.sub(r"[^A-Za-zÀ-ɏऀ-ॿ]", "", text)
-    if len(letters) >= 2 and letters.isupper() and b not in NOT_NAMES:
+    if len(letters) >= 2 and letters.isupper() and b not in lex.not_names:
         return 7.5, "name (acronym)"
-    if text.lstrip("\"'“‘(")[:1].isupper() and b not in NOT_NAMES and len(b) > 1:
-        start = i == 0 or i in starts or bool(SENTENCE_END.search(words[i - 1]["text"]))
+    if text.lstrip(OPENERS)[:1].isupper() and b not in lex.not_names and len(b) > 1:
+        start = i == 0 or i in starts or opens_sentence(text) or bool(SENTENCE_END.search(words[i - 1]["text"]))
         stem = b[:-2] if b.endswith("'s") else b
         if not start or stem in names:
             return 7, "name"
-    if b in CONTRAST:
+    if b in lex.contrast:
         return 6, "contrast word"
-    if b in NUMBER_WORDS:
+    if b in lex.number_words:
         return 5.5, "count"
     return 0, None
 
 
-def guess_score(text):
+def guess_score(text, lex=DEFAULT_LEXICON):
     """The old fallback: a long content word. Only used in auto mode on pages with nothing better."""
     b = bare(text)
-    if not b or b in STOP or b in DULL or len(b) < 4:
+    if not b or b in lex.stop or b in lex.dull or len(b) < 4:
         return 0
     s = min(len(b), 10) / 2.0
     if SENTENCE_END.search(text):
@@ -106,10 +155,11 @@ def guess_score(text):
     return s
 
 
-def rule_picks(pages, mode="auto", forced=()):
+def rule_picks(pages, mode="auto", forced=(), language=None):
     """Set emphasis and reason on every word from the rules. forced words always win their page."""
     if mode not in MODES:
         raise ValueError(f"emphasis mode must be one of {', '.join(MODES)}")
+    lex = lexicon(language)
     wanted = {bare(x) for x in forced if bare(x)}
     flat = [w for p in pages for w in p["words"]]
     # Lyrics have no full stops and every line starts with a capital: there, the first word of a line is a line start,
@@ -122,7 +172,7 @@ def rule_picks(pages, mode="auto", forced=()):
                 if j == 0 or w.get("line") != p["words"][j - 1].get("line"):
                     starts.add(k)
                 k += 1
-        caps = [i for i, w in enumerate(flat) if w["text"].lstrip("\"'“‘(")[:1].isupper() and bare(w["text"]) not in NOT_NAMES]
+        caps = [i for i, w in enumerate(flat) if w["text"].lstrip(OPENERS)[:1].isupper() and bare(w["text"]) not in lex.not_names]
         at_start = sum(1 for i in caps if i in starts)
         if len(caps) < 3 or at_start < 0.6 * len(caps):  # capitals sit mid-line: unpunctuated speech with names, not lyrics
             starts = set()
@@ -130,7 +180,8 @@ def rule_picks(pages, mode="auto", forced=()):
     names = set()
     for i, w in enumerate(flat):
         b = bare(w["text"])
-        if i and i not in starts and not SENTENCE_END.search(flat[i - 1]["text"]) and w["text"].lstrip("\"'“‘(")[:1].isupper() and b not in NOT_NAMES and b not in STOP:
+        if i and i not in starts and not opens_sentence(w["text"]) and not SENTENCE_END.search(flat[i - 1]["text"]) \
+                and w["text"].lstrip(OPENERS)[:1].isupper() and b not in lex.not_names and b not in lex.stop:
             names.add(b[:-2] if b.endswith("'s") else b)
     seen = {}
     at = 0
@@ -155,7 +206,7 @@ def rule_picks(pages, mode="auto", forced=()):
             for j, w in enumerate(ws):
                 if w["emphasis"]:
                     continue
-                score, reason = classify(flat, at + j, names, starts)
+                score, reason = classify(flat, at + j, names, starts, lex)
                 if mode == "numbers" and reason not in ("price", "percentage", "year", "number", "count"):
                     continue
                 if reason and not number_kind(w["text"]):
@@ -170,13 +221,13 @@ def rule_picks(pages, mode="auto", forced=()):
                 ws[j]["emphasis"], ws[j]["reason"] = True, reason
                 used += 1
                 if reason.startswith("name") and j + 1 < len(ws) and not ws[j + 1]["emphasis"]:
-                    s2, r2 = classify(flat, at + j + 1, names, starts)
+                    s2, r2 = classify(flat, at + j + 1, names, starts, lex)
                     if r2 and r2.startswith("name") and not SENTENCE_END.search(ws[j]["text"]):
                         ws[j + 1]["emphasis"], ws[j + 1]["reason"] = True, r2
             if mode == "auto" and used == 0 and quiet >= 2:
                 # nothing certain here or on the page before: guess the longest content word, so a stretch
                 # without numbers or names still gets a highlight now and then
-                best = max(((guess_score(w["text"]), -j, j) for j, w in enumerate(ws)), default=(0, 0, 0))
+                best = max(((guess_score(w["text"], lex), -j, j) for j, w in enumerate(ws)), default=(0, 0, 0))
                 if best[0] >= 4.0 and seen.get(key(ws[best[2]]["text"]), 0) == 0:
                     ws[best[2]]["emphasis"], ws[best[2]]["reason"] = True, "long word (a guess)"
         hit = False
@@ -322,7 +373,7 @@ def main():
         style = json.loads(sp.read_text())
     changed = False
     if a.mode:
-        rule_picks(cap["pages"], a.mode, split_words(a.words))
+        rule_picks(cap["pages"], a.mode, split_words(a.words), cap.get("language"))
         changed = True
     if a.clear:
         for p in cap["pages"]:

@@ -15,21 +15,23 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from cuts import clamp_pages, split_pages  # noqa: E402
-from emphasis import MODES, SENTENCE_END, WEAK_END, bare, finalise, rule_picks, split_words  # noqa: E402
+from emphasis import MODES, SENTENCE_END, WEAK_END, bare, finalise, lexicon, rule_picks, split_words  # noqa: E402
 from spoken_numbers import normalise_numbers  # noqa: E402
 
 CLAUSE_END = re.compile(r"[,;:–—]['\")\]]*$")
 FILLERS = {"um", "uh", "umm", "uhh", "erm", "hmm", "mm"}
+ES_FILLERS = {"eh", "ehh", "em", "emm", "ehm", "mmm"}  # Spanish speech only: "eh" and "em" are words in English
 
 
 def clean_words(words, replacements=None, strip_fillers=False, min_ms=80, close_gap_ms=30, numbers="auto", language=None):
     """Fix timings so every word is usable: ordered, at least min_ms long, tiny gaps closed."""
     out = []
+    fillers = FILLERS | ES_FILLERS if (language or "").lower().startswith("es") else FILLERS
     for w in words:
         text = (w.get("text") or "").strip()
         if not text:
             continue
-        if strip_fillers and bare(text) in FILLERS:
+        if strip_fillers and bare(text) in fillers:
             continue
         if replacements:
             key = bare(text)
@@ -72,7 +74,7 @@ def clean_words(words, replacements=None, strip_fillers=False, min_ms=80, close_
     return out
 
 
-def split_lines(words, max_chars, max_lines):
+def split_lines(words, max_chars, max_lines, weak_end=WEAK_END):
     """Assign a line index to each word: as few lines as fit (up to max_lines), split as evenly as possible."""
     texts = [w["text"] for w in words]
     n = len(words)
@@ -87,7 +89,7 @@ def split_lines(words, max_chars, max_lines):
         for k in cuts:
             if CLAUSE_END.search(texts[k - 1]) or SENTENCE_END.search(texts[k - 1]):
                 sc -= 3  # prefer breaking after punctuation
-            if bare(texts[k - 1]) in WEAK_END:
+            if bare(texts[k - 1]) in weak_end:
                 sc += 4  # do not leave "the" / "of" hanging at the end of a line
         return sc
 
@@ -151,7 +153,8 @@ def snap_to_beats(pages, beats, mode, hold, frame):
     return pages
 
 
-def group_pages(words, page_cfg, fps, wide, beats=None, cuts=None):
+def group_pages(words, page_cfg, fps, wide, beats=None, cuts=None, language=None):
+    weak_end = lexicon(language).weak_end
     max_words = int(page_cfg.get("maxWords", 3))
     max_lines = int(page_cfg.get("maxLines", 1))
     per_line = int(page_cfg.get("maxCharsPerLineWide" if wide else "maxCharsPerLine", 30 if wide else 18))
@@ -216,7 +219,7 @@ def group_pages(words, page_cfg, fps, wide, beats=None, cuts=None):
         # unless that would leave another weak word hanging
         for k in range(len(chunks) - 1):
             c, nx = chunks[k], chunks[k + 1]
-            if len(c) > 1 and bare(c[-1]["text"]) in WEAK_END and bare(c[-2]["text"]) not in WEAK_END and fits([c[-1]] + nx):
+            if len(c) > 1 and bare(c[-1]["text"]) in weak_end and bare(c[-2]["text"]) not in weak_end and fits([c[-1]] + nx):
                 nx.insert(0, c.pop())
         pages.extend(c for c in chunks if c)
 
@@ -280,7 +283,7 @@ def group_pages(words, page_cfg, fps, wide, beats=None, cuts=None):
             starts = page_lines[i]
             lines = [sum(1 for st in starts if st <= k) - 1 for k in range(len(p))]
         else:
-            lines = split_lines(p, per_line, max_lines)
+            lines = split_lines(p, per_line, max_lines, weak_end)
         out.append({
             "startMs": int(round(start / frame) * frame),
             "endMs": int(round(end / frame) * frame),
@@ -321,8 +324,8 @@ def main():
                     help="which words to highlight: auto (numbers, prices, names, contrast words), numbers (numbers only) or off")
     ap.add_argument("--emphasis-words", default="", help='words to highlight for sure, e.g. "gold, $5,000"')
     ap.add_argument("--no-auto-emphasis", action="store_true", help="same as --emphasis off")
-    ap.add_argument("--numbers", default="auto", choices=["auto", "western", "indian", "off"],
-                    help="rewrite spoken numbers as one token ($5,000, 40%%, ₹5 lakh); digit grouping: auto, western or indian; off keeps the transcript")
+    ap.add_argument("--numbers", default="auto", choices=["auto", "western", "indian", "european", "off"],
+                    help="rewrite spoken numbers as one token ($5,000, 40%%, ₹5 lakh); digit grouping: auto, western, indian or european (5.000 and 3,5); off keeps the transcript")
     ap.add_argument("--cuts", help="cuts.json from scripts/cuts.py ({\"cuts\": [ms, ...]}) or a comma-separated list of ms: pages never straddle a cut")
     ap.add_argument("--beats", help="beats.json from scripts/beats.py: music styles start pages on the beat")
     ap.add_argument("--replace", action="append", default=[], help="heard=Shown spelling fix, e.g. refs=Refs (repeatable)")
@@ -353,13 +356,13 @@ def main():
             cuts = sorted({int(c) for c in (json.loads(raw)["cuts"] if raw.lstrip().startswith("{") else raw.split(",")) if str(c).strip()})
         except (ValueError, KeyError):
             sys.exit("group.py: --cuts must be a cuts.json file or a comma-separated list of milliseconds")
-    pages = group_pages(words, page_cfg, fps, wide, beats, cuts)
+    pages = group_pages(words, page_cfg, fps, wide, beats, cuts, data.get("language"))
     mode, forced = a.emphasis, split_words(a.emphasis_words)
     if mode not in MODES:  # older calls passed the words here: --emphasis "gold,three" meant only these words
         forced, mode = forced + split_words(mode), "off"
     if a.no_auto_emphasis:
         mode = "off"
-    rule_picks(pages, mode, forced)
+    rule_picks(pages, mode, forced, data.get("language"))
     out = {
         "version": 1,
         "video": {"width": src["width"], "height": src["height"], "fps": fps, "durationMs": src["durationMs"]},
