@@ -177,13 +177,23 @@ writes an amount into one token that spans the time of the words it replaced:
 | "nineteen ninety one", "1991" | `1991` (years get no separator) |
 | "1500000", "1500000 rupees" | `1,500,000`, `₹15,00,000` |
 | "three times", "one of them", "a million reasons" | unchanged: small spelled numbers stay words |
+| Spanish: "cinco mil dólares", "cuarenta por ciento", "cinco millones de euros" | `$5,000`, `40%`, `€5 millones` |
+| Spanish: "mil novecientos noventa y uno", "dos mil veinticuatro" | `1991`, `2024` |
+| Spanish: "tres veces", "un día", "un millón de razones", "mil gracias" | unchanged |
 
-`--numbers western|indian` fixes the digit grouping (`auto` uses Indian grouping for rupee amounts and Hindi speech);
-`--numbers off` keeps the transcript as heard.
+`--numbers western|indian|european` fixes the digit grouping (`auto` uses Indian grouping for rupee amounts and Hindi
+speech); `--numbers off` keeps the transcript as heard.
+
+Spanish runs when the `language` of words.json starts with `es`. Its number words are read by `_read_number_es`, and a
+transcript's own `5.000` and `3,5` are read as five thousand and three and a half. `auto` writes numbers the way the
+transcript does: `european` (`5.000`, `3,5`) when it holds such a token, `western` otherwise. The Spanish lists for
+highlights, page endings and fillers (`ES_*` in `emphasis.py` and `group.py`) are added to the shared ones only for
+Spanish speech, because "son", "sin", "con" and "once" are content words in English. A new language follows the same
+steps: a number reader, the `ES_*` lists under a `Lexicon`, and cases in `tests/test_emphasis.py`.
 
 `scripts/emphasis.py` holds the rules and the command line for picks:
 
-- `rule_picks(pages, mode, forced)`: `auto` scores each word (price 10, percentage, year, number 9+, acronym or name 7,
+- `rule_picks(pages, mode, forced, language)`: `auto` scores each word (price 10, percentage, year, number 9+, acronym or name 7,
   contrast word 6, count word 5.5), takes the best 1 or 2 per page, lowers a repeated name each time it comes back, and
   on a stretch with nothing certain guesses one long word, marked `long word (a guess)`. `numbers` keeps only the number
   kinds. `off` keeps only forced words.

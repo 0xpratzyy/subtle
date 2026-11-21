@@ -62,10 +62,50 @@ NUMBERS = [
 ]
 
 
+SPANISH_NUMBERS = [
+    ("el oro cuesta cinco mil dólares ahora", "el | oro | cuesta | $5,000 | ahora"),
+    ("cuesta 5000 dolares, vale", "cuesta | $5,000, | vale"),
+    ("subió un 40 por ciento desde 1991.", "subió | un | 40% | desde | 1991."),
+    ("cuarenta por ciento de la gente", "40% | de | la | gente"),
+    ("tres coma cinco por ciento de crecimiento", "3.5% | de | crecimiento"),
+    ("cien por ciento seguro", "100% | seguro"),
+    ("veinticinco mil personas", "25,000 | personas"),
+    ("dieciséis mil quinientas personas", "16,500 | personas"),
+    ("ciento treinta y cinco personas", "135 | personas"),
+    ("treinta y cinco euros", "€35"),
+    ("5 mil dólares", "$5,000"),
+    ("en mil novecientos noventa y uno, México", "en | 1991, | México"),
+    ("en dos mil veinticuatro nosotros", "en | 2024 | nosotros"),
+    ("dos mil personas", "2,000 | personas"),
+    ("cinco millones de dólares recaudados", "$5 millones | recaudados"),
+    ("un millón de dólares", "$1 millón"),
+    ("cinco mil millones de euros", "€5,000 millones"),
+    # the transcript already writes 5.000 and 3,5: read them right and keep that convention
+    ("cuesta 5.000 euros al mes", "cuesta | €5.000 | al | mes"),
+    ("subió 3,5% este año", "subió | 3,5% | este | año"),
+    ("vale 1.234,56 euros", "vale | €1.234,56"),
+    ("3,5 millones de euros", "€3,5 millones"),
+    # left alone on purpose
+    ("tres veces, y cada vez", "tres | veces, | y | cada | vez"),
+    ("uno de los mejores", "uno | de | los | mejores"),
+    ("diez, veinte, treinta", "diez, | veinte, | treinta"),
+    ("un día cualquiera", "un | día | cualquiera"),
+    ("un millón de razones", "un | millón | de | razones"),
+    ("mil gracias por venir", "mil | gracias | por | venir"),
+    ("tengo treinta y tú veinte", "tengo | treinta | y | tú | veinte"),
+]
+
+
 def main():
     for line, want in NUMBERS:
         got = norm(line)
         check(got == want, f"numbers: {line!r} -> {got!r}, expected {want!r}")
+    for line, want in SPANISH_NUMBERS:
+        got = norm(line, "es")
+        check(got == want, f"numbers: Spanish {line!r} -> {got!r}, expected {want!r}")
+    check(norm("cinco mil dólares y 3.5 por ciento", "es", "european") == "$5.000 | y | 3,5%", "numbers: --numbers european")
+    check(norm("cuesta 5.000 euros", "es", "western") == "cuesta | €5,000", "numbers: Spanish '5.000' with --numbers western")
+    check(norm("once people came at 5.000 volts") == "once | people | came | at | 5 | volts", "numbers: Spanish rules must not run on English")
     check(norm("paanch lakh rupaye lagte hain", "hi") == "₹5 lakh | lagte | hain", "numbers: Hindi 'paanch lakh rupaye'")
     check(norm("do baar bola", "hi") == "do | baar | bola", "numbers: Hindi 'do' without a unit must stay a word")
     check(norm("1500000 rupees") == "₹15,00,000", "numbers: rupee amounts use Indian grouping by default")
@@ -80,12 +120,25 @@ def main():
     check(split_words("25,000,1968") == ["25,000", "1968"], "split_words: '25,000,1968'")
 
     # rule picks: the number wins the page; names and contrast words follow; filler words never
-    def picks(line, mode="auto", forced=(), size=4):
-        ws = normalise_numbers(words(line))
+    def picks(line, mode="auto", forced=(), size=4, lang=None):
+        ws = normalise_numbers(words(line), lang)
         pages = [{"startMs": ws[i]["startMs"], "endMs": ws[min(i + size, len(ws)) - 1]["endMs"],
                   "words": [dict(w, emphasis=False) for w in ws[i:i + size]]} for i in range(0, len(ws), size)]
-        rule_picks(pages, mode, forced)
+        rule_picks(pages, mode, forced, lang)
         return [(w["text"], w["reason"]) for p in pages for w in p["words"] if w["emphasis"]], pages
+
+    # Spanish: its own contrast and stop words; a capital after ¿ or ¡ starts a sentence, it is not a name
+    got, _ = picks("¿Sabes cuánto cuesta? Cuesta cinco mil dólares y nunca baja ni sube. ¡Nadie lo esperaba! Entonces María se mudó "
+                   "a Guatemala con su familia.", size=3, lang="es")
+    texts = [t for t, _ in got]
+    check(("$5,000", "price") in got, f"rules: Spanish '$5,000' must be highlighted, got {got}")
+    check(("nunca", "contrast word") in got and ("¡Nadie", "contrast word") in got, f"rules: Spanish contrast words, got {got}")
+    check(("María", "name") in got and ("Guatemala", "name") in got, f"rules: Spanish names, got {got}")
+    check(not any(t in ("¿Sabes", "Cuesta", "Entonces", "con", "su", "lo") for t in texts), f"rules: Spanish sentence starts or filler words picked: {got}")
+    got, _ = picks("y luego ¿Sabes qué pasó con todo eso", size=4, lang="es")
+    check(not any(r == "name" for _, r in got), f"rules: a capital after ¿ is not a name, got {got}")
+    got, _ = picks("my son has no sin and once had a con", size=3)
+    check(not any(r == "count" for _, r in got), f"rules: Spanish lists must not run on English, got {got}")
 
     got, _ = picks("so the gold price is five thousand dollars today okay")
     check(("$5,000", "price") in got, f"rules: '$5,000' must be highlighted, got {got}")
@@ -125,6 +178,22 @@ def main():
             check(all(a["endMs"] <= b["startMs"] for a, b in zip(cap["pages"], cap["pages"][1:])), f"{style}: pages overlap after the hold")
             if style == "keyword":
                 check(any(b["text"] in ("$5,000", "40%", "1991") for b in cap.get("big", [])), "keyword: no number among the giant words")
+        # Spanish through group.py: the language in words.json picks the rules; pages do not end on "de" or "el"
+        line = "Eh, el precio del oro es de cinco mil dólares hoy. Subió un cuarenta por ciento y nadie lo vio venir."
+        wj.write_text(json.dumps({"source": src, "language": "es", "words": words(line, 400)}))
+        subprocess.run([sys.executable, str(ROOT / "scripts" / "group.py"), str(wj), "--style", str(ROOT / "styles" / "glide.json"),
+                        "--out", str(cj), "--clean"], check=True, capture_output=True)
+        cap = json.loads(cj.read_text())
+        flat = [w for p in cap["pages"] for w in p["words"]]
+        check(any(w["text"] == "$5,000" and w["emphasis"] for w in flat) and any(w["text"] == "40%" and w["emphasis"] for w in flat),
+              f"Spanish: '$5,000' and '40%' must be highlighted tokens, got {[w['text'] for w in flat]}")
+        check(not any(w["text"].lower().startswith("eh") for w in flat), "Spanish: --clean must drop 'eh'")
+        ends = [p["words"][-1]["text"].lower() for p in cap["pages"] if len(p["words"]) > 1]
+        check(not any(e in ("el", "del", "de", "un", "y", "lo") for e in ends), f"Spanish: a page ends on a weak word: {ends}")
+        wj.write_text(json.dumps({"source": src, "language": "en", "words": words(
+            "The gold price is five thousand dollars today. It is up forty percent since 1991 and nobody saw it coming.", 400)}))
+        subprocess.run([sys.executable, str(ROOT / "scripts" / "group.py"), str(wj), "--style", str(ROOT / "styles" / "title.json"),
+                        "--out", str(cj)], check=True, capture_output=True)
         # picks by hand: one page, by word text; then drop one
         cap = json.loads(cj.read_text())
         page = next(i for i, p in enumerate(cap["pages"]) if any("nobody" in w["text"] for w in p["words"]))
@@ -145,7 +214,7 @@ def main():
         for f in failures:
             print(" -", f)
         sys.exit(1)
-    print(f"ok: {len(NUMBERS) + 6} number cases, rule picks, modes and hand picks passed")
+    print(f"ok: {len(NUMBERS) + len(SPANISH_NUMBERS) + 9} number cases, rule picks, modes and hand picks passed")
 
 
 if __name__ == "__main__":

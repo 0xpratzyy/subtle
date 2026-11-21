@@ -116,8 +116,8 @@ def main():
     ap.add_argument("--emphasis", default="auto",
                     help="which words to highlight: auto (numbers, prices, names, contrast words), numbers (numbers only) or off")
     ap.add_argument("--emphasis-words", default="", help='words to highlight for sure, e.g. "gold, $5,000" (use single quotes in a shell)')
-    ap.add_argument("--numbers", default="auto", choices=["auto", "western", "indian", "off"],
-                    help="spoken numbers become one token ($5,000, 40%%, ₹5 lakh); digit grouping auto, western or indian; off keeps the transcript")
+    ap.add_argument("--numbers", default="auto", choices=["auto", "western", "indian", "european", "off"],
+                    help="spoken numbers become one token ($5,000, 40%%, ₹5 lakh); digit grouping auto, western, indian or european (5.000 and 3,5); off keeps the transcript")
     ap.add_argument("--replace", action="append", default=[], help="heard=Shown spelling fix (repeatable)")
     ap.add_argument("--clean", action="store_true", help="drop filler words")
     ap.add_argument("--words", help="use this words.json and skip transcription")
