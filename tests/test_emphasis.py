@@ -30,6 +30,12 @@ def norm(line, lang=None, grouping="auto"):
 
 NUMBERS = [
     ("gold price is five thousand dollars now", "gold | price | is | $5,000 | now"),
+    # money keeps its cents; a percentage or an amount in millions does not need them
+    ("it costs 3.50 dollars", "it | costs | $3.50"),
+    ("it costs $3.50 today", "it | costs | $3.50 | today"),
+    ("about 2.9 euros", "about | €2.90"),
+    ("growth of 3.5 percent", "growth | of | 3.5%"),
+    ("a $3.5 million round", "a | $3.5 million | round"),
     ("gold price is $5000.", "gold | price | is | $5,000."),
     ("it costs 5000 dollars, okay", "it | costs | $5,000, | okay"),
     ("up 40 percent since 1991.", "up | 40% | since | 1991."),
@@ -64,6 +70,7 @@ NUMBERS = [
 
 SPANISH_NUMBERS = [
     ("el oro cuesta cinco mil dólares ahora", "el | oro | cuesta | $5,000 | ahora"),
+    ("cuesta 3,50 euros", "cuesta | €3,50"),
     ("cuesta 5000 dolares, vale", "cuesta | $5,000, | vale"),
     ("subió un 40 por ciento desde 1991.", "subió | un | 40% | desde | 1991."),
     ("cuarenta por ciento de la gente", "40% | de | la | gente"),

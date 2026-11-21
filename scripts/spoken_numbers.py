@@ -81,10 +81,11 @@ def group_digits(n, indian=False):
     return ",".join(parts + [tail])
 
 
-def _fmt(value, indian=False, year_ok=False):
-    """A number as caption text. Whole numbers get separators; 1900-2100 stays a bare year when year_ok."""
+def _fmt(value, indian=False, year_ok=False, money=False):
+    """A number as caption text. Whole numbers get separators; 1900-2100 stays a bare year when year_ok. An amount of
+    money with cents keeps two decimals ($3.50, not $3.5)."""
     if isinstance(value, float) and not value.is_integer():
-        whole, frac = f"{value:.4f}".rstrip("0").split(".")
+        whole, frac = (f"{value:.2f}" if money else f"{value:.4f}".rstrip("0")).split(".")
         return group_digits(int(whole), indian) + "." + frac
     v = int(value)
     if year_ok and 1900 <= v <= 2100:
@@ -304,8 +305,8 @@ def normalise_numbers(words, language=None, grouping="auto"):
     def read(cs, k):
         return _read_number_es(cs, k, currency) if spanish else _read_number(cs, k, hindi)
 
-    def fmt(value, indian, year_ok):
-        s = _fmt(value, indian, year_ok)
+    def fmt(value, indian, year_ok, money=False):
+        s = _fmt(value, indian, year_ok, money)
         return s.translate(EURO_SWAP) if european else s
 
     def closed(a, b):
@@ -340,7 +341,8 @@ def normalise_numbers(words, language=None, grouping="auto"):
             if v is not None:
                 indian = grouping == "indian" or (grouping == "auto" and (m.group(1) == "₹" or hindi))
                 plain = m.group(2).isdigit() if spanish else "," not in m.group(2)
-                txt = m.group(1) + fmt(v, indian, year_ok=not m.group(1) and not m.group(3) and plain) + (m.group(3) or "")
+                txt = m.group(1) + fmt(v, indian, year_ok=not m.group(1) and not m.group(3) and plain,
+                                       money=bool(m.group(1)) and not m.group(3)) + (m.group(3) or "")
                 w = dict(words[i])
                 w["text"] = lead + txt + trail
                 out.append(w)
@@ -384,7 +386,8 @@ def normalise_numbers(words, language=None, grouping="auto"):
             continue
         indian = grouping == "indian" or (grouping == "auto" and (sign == "₹" or hindi or big in ("lakh", "crore")))
         bare_year = only_digit and not sign and not suffix and (cores[j].isdigit() if spanish else "," not in cores[j])
-        txt = sign + fmt(value, indian, year_ok=(bare_year or is_year) and not sign and not suffix and not big)
+        txt = sign + fmt(value, indian, year_ok=(bare_year or is_year) and not sign and not suffix and not big,
+                         money=bool(sign) and not suffix and not big)
         if big:
             txt += " " + (big[:-2] + "ones" if spanish and value != 1 else big)  # millón -> millones
         txt += suffix
