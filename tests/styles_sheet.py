@@ -77,14 +77,14 @@ def main():
     a = ap.parse_args()
     caps = Path(a.caps)
     names = a.styles.split(",") if a.styles else sorted(p.stem for p in caps.glob("*.json"))
-    notes = json.loads(Path(a.notes).read_text()) if a.notes else {}
+    notes = json.loads(Path(a.notes).read_text(encoding="utf-8")) if a.notes else {}
     span = tuple(float(x) for x in (a.shot_wide if a.moment == "wide" else a.shot_close).split("-")) if a.moment in ("wide", "close") else None
     work = Path(tempfile.mkdtemp(prefix="sheet-"))
     jobs, plan = [], {}
     for n in names:
-        cap = json.loads((caps / f"{n}.json").read_text())
+        cap = json.loads((caps / f"{n}.json").read_text(encoding="utf-8"))
         st_path = ROOT / "styles" / f"{n}.json"
-        st = json.loads(st_path.read_text())
+        st = json.loads(st_path.read_text(encoding="utf-8"))
         fps = cap["video"]["fps"]
         t = moment(cap, st, a.moment, span) if span else float(a.moment)
         t = {k: float(v) for k, v in (x.split("=") for x in a.at.split(",") if x)}.get(n, t)
@@ -94,9 +94,9 @@ def main():
         plan[n] = (t, layers)
         for ly in layers:
             jobs.append({"captions": str(caps / f"{n}.json"), "style": str(st_path), "layer": ly, "frame": fr, "png": str(work / f"{n}.{ly}.png")})
-    (work / "jobs.json").write_text(json.dumps(jobs))
+    (work / "jobs.json").write_text(json.dumps(jobs), encoding="utf-8")
     subprocess.run(["node", str(ROOT / "template" / "stills.mjs"), str(work / "jobs.json")], check=True, capture_output=True)
-    first = json.loads((caps / f"{names[0]}.json").read_text())["video"]
+    first = json.loads((caps / f"{names[0]}.json").read_text(encoding="utf-8"))["video"]
     W, H = first["width"], first["height"]
     tw = a.tile
     th = int(tw * H / W)

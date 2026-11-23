@@ -170,10 +170,10 @@ def main():
     out_path = Path(a.out).expanduser() if a.out else cached
 
     if cached.exists() and not a.no_cache:
-        data = json.loads(cached.read_text())
+        data = json.loads(cached.read_text(encoding="utf-8"))
         if out_path != cached:
             out_path.parent.mkdir(parents=True, exist_ok=True)
-            out_path.write_text(json.dumps(data, ensure_ascii=False, indent=1))
+            out_path.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
         print(json.dumps({"out": str(out_path), "words": len(data["words"]), "language": data["language"], "cached": True, "seconds": round(time.time() - t0, 2)}))
         return
 
@@ -218,10 +218,10 @@ def main():
                           "prob": round(float(w.get("probability", 0)), 3)})
     data = {"version": 1, "source": {"sha256": digest, **meta}, "language": result.get("language") or a.lang, "model": a.model,
             "script": a.script, "words": words}
-    cached.write_text(json.dumps(data, ensure_ascii=False, indent=1))
+    cached.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
     if out_path != cached:
         out_path.parent.mkdir(parents=True, exist_ok=True)
-        out_path.write_text(json.dumps(data, ensure_ascii=False, indent=1))
+        out_path.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
     secs = time.time() - t0
     print(json.dumps({"out": str(out_path), "words": len(words), "language": data["language"], "cached": False,
                       "seconds": round(secs, 2), "secondsPerMinuteOfVideo": round(secs / max(1e-6, meta["durationMs"] / 60000), 2)}))

@@ -71,8 +71,8 @@ def main():
     ap.add_argument("--prune-to", help="behind mode: measure every big word and write captions without the hidden ones here")
     a = ap.parse_args()
 
-    cap = json.load(open(a.captions))
-    style = json.load(open(a.style))
+    cap = json.load(open(a.captions, encoding="utf-8"))
+    style = json.load(open(a.style, encoding="utf-8"))
     W, H = cap["video"]["width"], cap["video"]["height"]
     pages = cap["pages"]
     if not pages:
@@ -88,7 +88,7 @@ def main():
             else:
                 dropped.append({"text": b["text"], "t": round((b["startMs"] + b["endMs"]) / 2000.0, 2), "visible": round(vis, 2)})
         cap["big"] = kept
-        json.dump(cap, open(a.prune_to, "w"), ensure_ascii=False, indent=1)
+        json.dump(cap, open(a.prune_to, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
         print(json.dumps({"kept": len(kept), "dropped": dropped, "out": a.prune_to}, ensure_ascii=False))
         return
     if not (a.video and a.source and a.out):

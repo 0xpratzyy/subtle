@@ -155,7 +155,7 @@ def main():
     except RuntimeError as e:  # cut detection is optional: report and carry on with no cuts
         res = {"cuts": [], "error": str(e)}
     if a.out:
-        json.dump(res, open(a.out, "w"))
+        json.dump(res, open(a.out, "w", encoding="utf-8"))
     print(json.dumps(res))
 
 

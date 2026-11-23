@@ -209,7 +209,7 @@ def subject_frames(video, times_ms, cache_dir=None):
     have = {}
     if path.exists():
         try:
-            have = {int(k): v for k, v in json.loads(path.read_text()).items()}
+            have = {int(k): v for k, v in json.loads(path.read_text(encoding="utf-8")).items()}
         except ValueError:
             have = {}
     need = sorted({int(t) for t in times_ms} - set(have))
@@ -220,7 +220,7 @@ def subject_frames(video, times_ms, cache_dir=None):
                 f = got.get(t)
                 if f is not None:
                     have[t] = f
-        path.write_text(json.dumps({str(k): v for k, v in have.items()}))
+        path.write_text(json.dumps({str(k): v for k, v in have.items()}), encoding="utf-8")
     return {int(t): have[int(t)] for t in times_ms if int(t) in have}
 
 
@@ -252,12 +252,12 @@ def main():
     ap.add_argument("--style", required=True)
     ap.add_argument("--out")
     a = ap.parse_args()
-    cap = json.load(open(a.captions))
-    style = json.load(open(a.style))
+    cap = json.load(open(a.captions, encoding="utf-8"))
+    style = json.load(open(a.style, encoding="utf-8"))
     if ensure_tool() is None:
         sys.exit("placement.py: needs macOS with the Xcode command line tools (vision-subject)")
     notes, rep = apply(a.video, cap, style, cap.get("cuts") or [])
-    json.dump(cap, open(a.out or a.captions, "w"), ensure_ascii=False, indent=1)
+    json.dump(cap, open(a.out or a.captions, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     print(json.dumps({"notes": notes, **rep}))
 
 
