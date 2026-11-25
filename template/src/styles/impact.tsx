@@ -1,5 +1,5 @@
 import React from 'react';
-import {Xf, clamp01, easeOut, easeOutBack, f30, mix, px, textWidth} from '../engine';
+import {Xf, clamp01, easeOut, easeOutBack, f30, mix, px, textWidth, letters} from '../engine';
 import type {PageProps, StyleDef, WordBox} from '../engine';
 
 // Heavy round caps. Every letter bounces in along an arc (rises from below, scales 40% -> 110% -> 100%, a little rotation),
@@ -41,7 +41,7 @@ const Page: React.FC<PageProps> = ({st, f, page, L, ws}) => {
   return (
     <Xf>
       {L.words.map((box, i) => {
-        const chars = [...box.text];
+        const chars = letters(box.text);
         const fill = page.words[i].emphasis ? st.activeColor! : st.color;
         return (
           <g key={i}>

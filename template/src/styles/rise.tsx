@@ -1,5 +1,5 @@
 import React from 'react';
-import {Xf, applyCase, baseFontSize, easeOutBack, fadeOut, f30, shoulderY, subjectIn, textWidth} from '../engine';
+import {Xf, applyCase, baseFontSize, easeOutBack, fadeOut, f30, shoulderY, subjectIn, textWidth, fontWithGlyphs, letters} from '../engine';
 import type {BigProps, StyleDef} from '../engine';
 import {activeBig, bigDrawn, inFront, placeX, toF, fitTo} from './behind-kit';
 import {SmallLine} from './behind-small';
@@ -14,8 +14,8 @@ const Big: React.FC<BigProps> = ({st, f, big, frame, captions, layer}) => {
   if (!bigDrawn(b, st, layer)) return null;
   const bh = st.behind!;
   const a = st.anim;
-  const font = bh.bigFont ?? st.font;
   const text = applyCase(b.text, 'upper');
+  const font = fontWithGlyphs(bh.bigFont ?? st.font, text);
   const ls = a.tracking ?? 0.01;
   const fit = fitTo(text, font, (f.W * (bh.bigWidth ?? 84)) / 100, baseFontSize(bh.bigMaxSize ?? 20, st, f), ls);
   const sub = subjectIn(captions, b.startMs, b.endMs);
@@ -31,7 +31,7 @@ const Big: React.FC<BigProps> = ({st, f, big, frame, captions, layer}) => {
   const drop = fit.cap * 1.35 + (rest - shoulder); // far enough that the whole letter is behind the body
   return (
     <Xf>
-      {[...text].map((ch, k) => {
+      {letters(text).map((ch, k) => {
         if (ch === ' ') return null;
         const x = left + textWidth(text.slice(0, k), font, fit.fs, ls);
         const tIn = (frame - s - k * stag + 1) / (inF + 1);

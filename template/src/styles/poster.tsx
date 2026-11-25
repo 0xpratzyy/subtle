@@ -1,5 +1,5 @@
 import React from 'react';
-import {Xf, applyCase, baseFontSize, behindY, blurCss, capHeight, easeOut, fadeOut, f30, subjectIn} from '../engine';
+import {Xf, applyCase, baseFontSize, behindY, blurCss, capHeight, easeOut, fadeOut, f30, subjectIn, fontWithGlyphs} from '../engine';
 import type {BigProps, FontSpec, StyleDef} from '../engine';
 import {activeBig, bigDrawn, inFront, placeX, toF, fitTo} from './behind-kit';
 import {SmallLine} from './behind-small';
@@ -26,8 +26,9 @@ const Big: React.FC<BigProps> = ({st, f, big, frame, captions, layer}) => {
   const lines = words.map((w, k) => {
     const sp = spec(k);
     const text = applyCase(w, sp.case);
-    const fit = fitTo(text, sp.font, width, maxFs * (k === 1 ? 1 : 0.8), sp.track);
-    return {text, sp, ...fit};
+    const font = fontWithGlyphs(sp.font, text);
+    const fit = fitTo(text, font, width, maxFs * (k === 1 ? 1 : 0.8), sp.track);
+    return {text, sp: {...sp, font}, ...fit};
   });
   const total = lines.reduce((s, l) => s + l.cap, 0) + gap * (lines.length - 1);
   const sub = subjectIn(captions, b.startMs, b.endMs);

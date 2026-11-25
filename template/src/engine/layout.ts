@@ -1,6 +1,6 @@
 import {measureText} from '@remotion/layout-utils';
 import type {Box, CPage, FontSpec, Frame, Style} from './types';
-import {fontWithGlyphs} from './fonts';
+import {fontWithGlyphs, isRtl} from './fonts';
 
 export const applyCase = (text: string, c: Style['case']) => (c === 'upper' ? text.toUpperCase() : c === 'lower' ? text.toLowerCase() : text);
 
@@ -139,6 +139,7 @@ export function layoutPage(page: CPage, st: Style, f: Frame, o: LayoutOpts = {})
   }
 
   const lineIds = [...new Set(wordLine)].sort((a, b) => a - b);
+  const rtl = texts.some((t) => isRtl(t));
   const lh = fs * (st.lineHeight ?? 1.15);
   const capH = capHeight(st.font) * fs;
   const cx = (f.W * (o.x ?? st.position.x ?? 50)) / 100;
@@ -152,7 +153,8 @@ export function layoutPage(page: CPage, st: Style, f: Frame, o: LayoutOpts = {})
     const y = cy - blockH / 2 + lh * (li + 0.5);
     const baseline = y + capH / 2;
     let x = o.align === 'left' ? cx - blockW / 2 : cx - lw / 2;
-    for (const i of idx) {
+    // Urdu reads right to left: the first word goes on the right.
+    for (const i of rtl ? [...idx].reverse() : idx) {
       words[i] = {i, text: texts[i], font: fonts[i], fs: fs * muls[i], ls: lss[i], left: x, w: m.widths[i] - (specs[i].pad ?? 0) * fs, cx: x + (m.widths[i] - (specs[i].pad ?? 0) * fs) / 2, line: li, baseline: baseline + (specs[i].dy ?? 0) * fs};
       x += m.widths[i] + m.space;
     }

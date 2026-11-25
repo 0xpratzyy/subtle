@@ -11,7 +11,9 @@ export const Captions: React.FC<{captions: CaptionsFile; style: Style; layer: La
   const [handle] = useState(() => delayRender('subtle: loading fonts', {timeoutInMilliseconds: 60000}));
   const [ready, setReady] = useState(false);
   useEffect(() => {
-    loadFonts(st)
+    // every word on screen, so the Indian-script and Urdu fonts the captions need are loaded too
+    const text = [...captions.pages.flatMap((p) => p.words.map((w) => w.text)), ...(captions.big ?? []).map((b) => b.text)].join(' ');
+    loadFonts(st, text)
       .then(() => {
         setReady(true);
         continueRender(handle);

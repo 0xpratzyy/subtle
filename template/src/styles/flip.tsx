@@ -1,5 +1,5 @@
 import React from 'react';
-import {Xf, capHeight, colorMix, emphasisOf, f30, fadeOut, styleShadow, textWidth, easeOutBack} from '../engine';
+import {Xf, capHeight, colorMix, emphasisOf, f30, fadeOut, styleShadow, textWidth, easeOutBack, letters} from '../engine';
 import type {PageProps, StyleDef, WordBox} from '../engine';
 
 // Every letter flips in like a split-flap tile: it turns edge-on and settles upright, with a short trail of ghost copies
@@ -39,7 +39,7 @@ const Page: React.FC<PageProps> = ({st, f, page, L, ws, left}) => {
         const fill = page.words[i].emphasis ? e.color ?? st.color : st.color;
         return (
           <g key={i}>
-            {[...box.text].map((ch, k) => {
+            {letters(box.text).map((ch, k) => {
               const x = box.left + textWidth(box.text.slice(0, k), box.font, box.fs, box.ls);
               const t = (ws[i].since - k * stag + 1) / (dur + 1);
               return <Letter key={k} ch={ch} box={box} x={x} p={ws[i].since < 0 ? 0 : easeOutBack(t, a.overshoot)} fill={fill} shade={a.shade} trail={a.trail} capH={capH} />;

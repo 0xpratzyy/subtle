@@ -1,5 +1,5 @@
 import React from 'react';
-import {Xf, capHeight, clamp01, dropShadow, easeOut, f30, mix, px, textWidth} from '../engine';
+import {Xf, capHeight, clamp01, dropShadow, easeOut, f30, mix, px, textWidth, fontWithGlyphs} from '../engine';
 import type {PageProps, StyleDef} from '../engine';
 
 // A tilted pile: every word has its own size and rotation, the words overlap down a diagonal, key words are yellow.
@@ -13,7 +13,7 @@ const SHIFT = [0, 0.16, 0.04, 0.2, 0.08, 0.22];
 const Page: React.FC<PageProps> = ({st, f, page, pageIndex, L, ws}) => {
   const a = st.anim;
   const mirror = pageIndex % 2 ? -1 : 1;
-  const font = st.font;
+  const font = fontWithGlyphs(st.font, L.words.map((b) => b.text).join(' '));
   const ls = st.letterSpacing ?? 0;
   const emph = page.words.map((w) => !!w.emphasis);
   const text = L.words.map((b) => b.text);

@@ -1,5 +1,5 @@
 import React from 'react';
-import {Word, Xf, applyCase, baseFontSize, blurCss, behindY, capHeight, easeOut, fadeOut, f30, fadeIn, riseIn, subjectIn, styleShadow, emphasisOf} from '../engine';
+import {Word, Xf, applyCase, baseFontSize, blurCss, behindY, capHeight, easeOut, fadeOut, f30, fadeIn, riseIn, subjectIn, styleShadow, emphasisOf, fontWithGlyphs} from '../engine';
 import type {BigProps, PageProps, StyleDef, WordBox, WordSpec} from '../engine';
 import {activeBig, bigDrawn, inFront, placeX, reflow, smallIdx, toF, fitTo} from './behind-kit';
 
@@ -15,8 +15,8 @@ const Big: React.FC<BigProps> = ({st, f, big, frame, captions, layer}) => {
   if (!bigDrawn(b, st, layer)) return null;
   const bh = st.behind!;
   const a = st.anim;
-  const font = bh.bigFont ?? st.font;
   const text = cap1(b.text);
+  const font = fontWithGlyphs(bh.bigFont ?? st.font, text);
   const fit = fitTo(text, font, (f.W * (bh.bigWidth ?? 94)) / 100, baseFontSize(bh.bigMaxSize ?? 30, st, f), a.bigTracking ?? -0.01);
   const sub = subjectIn(captions, b.startMs, b.endMs);
   const shot = {startMs: 0, endMs: 0, bands: sub.bands};

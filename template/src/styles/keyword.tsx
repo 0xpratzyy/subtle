@@ -1,5 +1,5 @@
 import React from 'react';
-import {Word, emphasisOf, Xf, applyCase, baseFontSize, capHeight, easeOutBack, fadeOut, f30, fitWord, riseIn, styleShadow} from '../engine';
+import {Word, emphasisOf, Xf, applyCase, baseFontSize, capHeight, easeOutBack, fadeOut, f30, fitWord, riseIn, styleShadow, fontWithGlyphs} from '../engine';
 import type {BigProps, CBig, Frame, PageProps, Style, StyleDef, WordBox} from '../engine';
 
 // One giant keyword that sits behind the speaker (the "behind" layer); the other words are small and stacked
@@ -10,8 +10,8 @@ const toF = (ms: number, fps: number) => Math.floor((ms * fps) / 1000 + 1e-6);
 
 function bigGeom(b: CBig, st: Style, f: Frame) {
   const bh = st.behind!;
-  const font = bh.bigFont ?? st.font;
   const text = applyCase(b.text, 'upper');
+  const font = fontWithGlyphs(bh.bigFont ?? st.font, text);
   // a `front` word (a number) sits lower, in front of the speaker's chest, a little narrower: it must not cover the face
   const {fs, w} = fitWord(text, font, (f.W * (b.front ? bh.frontWidth ?? 78 : bh.bigWidth ?? 90)) / 100, baseFontSize(bh.bigMaxSize ?? 30, st, f), 0.01);
   const cy = (f.H * (b.front ? bh.frontY ?? 60 : bh.bigY ?? 40)) / 100;

@@ -1,5 +1,5 @@
 import React from 'react';
-import {Xf, applyCase, baseFontSize, behindY, easeOutExpo, fadeOut, f30, subjectIn, textWidth} from '../engine';
+import {Xf, applyCase, baseFontSize, behindY, easeOutExpo, fadeOut, f30, subjectIn, textWidth, fontWithGlyphs, letters} from '../engine';
 import type {BigProps, StyleDef} from '../engine';
 import {activeBig, bigDrawn, inFront, placeX, toF, fitTo} from './behind-kit';
 import {SmallLine} from './behind-small';
@@ -14,8 +14,8 @@ const Big: React.FC<BigProps> = ({st, f, big, frame, captions, layer}) => {
   if (!bigDrawn(b, st, layer)) return null;
   const bh = st.behind!;
   const a = st.anim;
-  const font = bh.bigFont ?? st.font;
   const text = applyCase(b.text, 'upper');
+  const font = fontWithGlyphs(bh.bigFont ?? st.font, text);
   const fit = fitTo(text, font, (f.W * (bh.bigWidth ?? 80)) / 100, baseFontSize(bh.bigMaxSize ?? 30, st, f), 0.01);
   const sub = subjectIn(captions, b.startMs, b.endMs);
   const front = inFront(b, layer);
@@ -29,7 +29,7 @@ const Big: React.FC<BigProps> = ({st, f, big, frame, captions, layer}) => {
   const op = fadeOut(e - frame, f30(a.bigOut, f.fps));
   const lh = fit.fs * 1.0;
   const id = `nm${b.startMs}`;
-  const chars = [...text];
+  const chars = letters(text);
   let digit = 0;
   return (
     <Xf opacity={op * (bh.bigOpacity ?? 1)}>

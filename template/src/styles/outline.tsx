@@ -1,5 +1,5 @@
 import React from 'react';
-import {Xf, easeInOut, applyCase, baseFontSize, behindY, capHeight, easeOut, fadeOut, f30, subjectIn} from '../engine';
+import {Xf, easeInOut, applyCase, baseFontSize, behindY, capHeight, easeOut, fadeOut, f30, subjectIn, fontWithGlyphs} from '../engine';
 import type {BigProps, StyleDef} from '../engine';
 import {activeBig, bigDrawn, inFront, placeX, toF, fitTo} from './behind-kit';
 import {SmallLine} from './behind-small';
@@ -16,8 +16,8 @@ const Big: React.FC<BigProps> = ({st, f, big, frame, captions, layer}) => {
   if (!bigDrawn(b, st, layer)) return null;
   const bh = st.behind!;
   const a = st.anim;
-  const font = bh.bigFont ?? st.font;
   const text = applyCase(b.text, 'upper');
+  const font = fontWithGlyphs(bh.bigFont ?? st.font, text);
   const fit = fitTo(text, font, (f.W * (bh.bigWidth ?? 90)) / 100, baseFontSize(bh.bigMaxSize ?? 30, st, f), 0.01);
   const sub = subjectIn(captions, b.startMs, b.endMs);
   const yPct = inFront(b, layer) ? (bh as any).frontY ?? 62 : behindY({startMs: 0, endMs: 0, bands: sub.bands}, ((fit.cap * 1.15) / f.H) * 100, bh.bigY ?? 20, (bh as any).target ?? 0.3);

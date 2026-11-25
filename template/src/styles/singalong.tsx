@@ -1,5 +1,5 @@
 import React from 'react';
-import {Word, Xf, beatGrid, clamp01, colorMix, easeInOut, easeOut, emphasisOf, f30, fadeOut, fadeIn, mix, sinceBeat, styleShadow, textWidth} from '../engine';
+import {Word, Xf, beatGrid, clamp01, colorMix, easeInOut, easeOut, emphasisOf, f30, fadeOut, fadeIn, mix, sinceBeat, styleShadow, textWidth, letters} from '../engine';
 import type {PageProps, StyleDef} from '../engine';
 
 // Default (`mode: wipe`): the block of up to four lines sits on a dark field. Unsung text is off-white; as each word is
@@ -35,7 +35,7 @@ const Page: React.FC<PageProps> = ({st, f, page, L, ws, frame, since, left, page
       return <Word key={i} box={box} fill={em ? e.color ?? st.color : st.color} opacity={mix(a.dim, 1, k)} />;
     }
     const sung = em ? e.color ?? st.activeColor! : st.activeColor!;
-    const n = [...box.text].length;
+    const n = letters(box.text).length;
     const lettersDone = w.state === 'spoken' ? n : w.state === 'upcoming' ? 0 : Math.min(n, Math.floor(w.progress * n) + 1);
     const id = `sa-${pageIndex}-${i}`;
     return (
@@ -47,7 +47,7 @@ const Page: React.FC<PageProps> = ({st, f, page, L, ws, frame, since, left, page
           ) : (
             <>
               <clipPath id={id}>
-                <rect x={box.left - box.fs * 0.1} y={box.baseline - box.fs * 1.1} width={textWidth([...box.text].slice(0, lettersDone).join(''), box.font, box.fs, box.ls) + box.fs * 0.1} height={box.fs * 1.6} />
+                <rect x={box.left - box.fs * 0.1} y={box.baseline - box.fs * 1.1} width={textWidth(letters(box.text).slice(0, lettersDone).join(''), box.font, box.fs, box.ls) + box.fs * 0.1} height={box.fs * 1.6} />
               </clipPath>
               <g clipPath={`url(#${id})`}>
                 <Word box={box} fill={sung} />
