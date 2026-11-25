@@ -365,12 +365,12 @@ def main():
     ap.add_argument("--drop", action="append", default=[], metavar="PAGE:WORD", help="remove one highlight")
     a = ap.parse_args()
 
-    cap = json.load(open(a.captions))
+    cap = json.load(open(a.captions, encoding="utf-8"))
     style = None
     if a.style:
         from pathlib import Path
         sp = Path(a.style) if a.style.endswith(".json") else Path(__file__).resolve().parent.parent / "styles" / f"{a.style}.json"
-        style = json.loads(sp.read_text())
+        style = json.loads(sp.read_text(encoding="utf-8"))
     changed = False
     if a.mode:
         rule_picks(cap["pages"], a.mode, split_words(a.words), cap.get("language"))
@@ -408,7 +408,7 @@ def main():
             elif not w.get("emphasis"):
                 w.pop("reason", None)
     finalise(cap, style)
-    json.dump(cap, open(a.captions, "w"), ensure_ascii=False, indent=1)
+    json.dump(cap, open(a.captions, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     if a.show:
         print(show(cap))
     n = sum(1 for p in cap["pages"] for w in p["words"] if w.get("emphasis"))

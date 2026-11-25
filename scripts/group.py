@@ -332,8 +332,8 @@ def main():
     ap.add_argument("--clean", action="store_true", help="drop filler words (um, uh)")
     a = ap.parse_args()
 
-    data = json.load(open(a.words))
-    style = json.load(open(a.style))
+    data = json.load(open(a.words, encoding="utf-8"))
+    style = json.load(open(a.style, encoding="utf-8"))
     src = data["source"]
     fps = float(src.get("fps") or 30)
     wide = src["width"] > src["height"]
@@ -348,10 +348,10 @@ def main():
     words = clean_words(data["words"], repl, a.clean, numbers=a.numbers, language=data.get("language"))
     if not words:
         sys.exit("group.py: no words in " + a.words)
-    beats = json.load(open(a.beats)) if a.beats else None
+    beats = json.load(open(a.beats, encoding="utf-8")) if a.beats else None
     cuts = []
     if a.cuts:
-        raw = open(a.cuts).read() if Path(a.cuts).exists() else a.cuts
+        raw = open(a.cuts, encoding="utf-8").read() if Path(a.cuts).exists() else a.cuts
         try:
             cuts = sorted({int(c) for c in (json.loads(raw)["cuts"] if raw.lstrip().startswith("{") else raw.split(",")) if str(c).strip()})
         except (ValueError, KeyError):
@@ -376,9 +376,9 @@ def main():
         out["cuts"] = cuts
     finalise(out, style)  # emphasised pages hold a beat longer; styles with a giant word get their `big` list
     clamp_pages(pages, cuts, fps)  # the longer hold must not run past a cut either
-    json.dump(out, open(a.out, "w"), ensure_ascii=False, indent=1)
+    json.dump(out, open(a.out, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     if a.srt:
-        open(a.srt, "w").write(to_srt(pages, style.get("case")))
+        open(a.srt, "w", encoding="utf-8").write(to_srt(pages, style.get("case")))
     n = sum(len(p["words"]) for p in pages)
     picks = [{"page": i, "word": w["text"], "reason": w.get("reason")} for i, p in enumerate(pages) for w in p["words"] if w["emphasis"]]
     print(json.dumps({"pages": len(pages), "words": n, "big": len(out.get("big", [])), "highlighted": len(picks), "out": a.out}, ensure_ascii=False))

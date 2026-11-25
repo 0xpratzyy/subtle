@@ -86,7 +86,7 @@ def main():
             r = subprocess.run(runner + [str(ROOT / "scripts" / "beats.py"), str(wav), "--out", str(out), "--no-cache"], capture_output=True, text=True)
             check(r.returncode == 0, f"beats.py failed: {r.stderr[-300:]}")
             if r.returncode == 0:
-                b = json.loads(out.read_text())
+                b = json.loads(out.read_text(encoding="utf-8"))
                 check(b["bpm"] and abs(b["bpm"] - 120) < 1.5, f"beats: tempo {b['bpm']}, expected 120")
                 err = [min(abs(t - (250 + 500 * k)) for k in range(41)) for t in b["times"]]
                 check(len(b["times"]) >= 34 and sorted(err)[int(len(err) * 0.9)] <= 35, f"beats: 90% of beats should be within 35 ms of a click: {sorted(err)[-5:]}")

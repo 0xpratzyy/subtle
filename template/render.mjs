@@ -48,7 +48,7 @@ for (const f of fontSpecs(style)) {
 
 if (!fs.existsSync(path.join(here, 'node_modules', 'remotion'))) {
   console.error('template/node_modules is missing, running npm ci (first run only)...');
-  const r = spawnSync('npm', ['ci', '--no-audit', '--no-fund'], {cwd: here, stdio: 'inherit'});
+  const r = spawnSync('npm', ['ci', '--no-audit', '--no-fund'], {cwd: here, stdio: 'inherit', shell: process.platform === 'win32'});
   if (r.status !== 0) die('npm ci failed');
 }
 

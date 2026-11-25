@@ -16,11 +16,11 @@ def group(style, *extra):
         srt = Path(tmp) / "captions.srt"
         subprocess.run([sys.executable, str(ROOT / "scripts" / "group.py"), str(WORDS), "--style", str(ROOT / "styles" / f"{style}.json"),
                         "--out", str(out), "--srt", str(srt), *extra], check=True, capture_output=True)
-        return json.loads(out.read_text()), srt.read_text()
+        return json.loads(out.read_text(encoding="utf-8")), srt.read_text(encoding="utf-8")
 
 
 def main():
-    words = json.loads(WORDS.read_text())["words"]
+    words = json.loads(WORDS.read_text(encoding="utf-8"))["words"]
     failures = []
 
     def check(cond, msg):
@@ -28,7 +28,7 @@ def main():
             failures.append(msg)
 
     for path in sorted((ROOT / "styles").glob("*.json")):
-        style = json.loads(path.read_text())
+        style = json.loads(path.read_text(encoding="utf-8"))
         name = style["name"]
         for key in ("name", "label", "description", "engines", "font", "case", "size", "wideScale", "color", "position", "page", "anim"):
             check(key in style, f"{name}: style is missing '{key}'")
@@ -61,7 +61,7 @@ def main():
     cap, _ = group(first, "--replace", "meera=Mira")
     check(any("Mira" in w["text"] for p in cap["pages"] for w in p["words"]), "--replace did not change the spelling")
     for name in names:
-        style = json.loads((ROOT / "styles" / f"{name}.json").read_text())
+        style = json.loads((ROOT / "styles" / f"{name}.json").read_text(encoding="utf-8"))
         if (style.get("behind") or {}).get("enabled"):
             cap, _ = group(name, "--emphasis", "gold,three,won")
             if not style["behind"].get("kinds") and not style["behind"].get("minWords"):  # numeral and poster only take numbers/names or phrases

@@ -159,13 +159,13 @@ def main():
     cache = cache_dir / f"{digest}-v{CACHE_VERSION}.json"
     cached = cache.exists() and not a.no_cache
     if cached:
-        res = json.loads(cache.read_text())
+        res = json.loads(cache.read_text(encoding="utf-8"))
     else:
         res = analyse(src)
         res["sha256"] = digest
         cache_dir.mkdir(parents=True, exist_ok=True)
-        cache.write_text(json.dumps(res))
-    Path(a.out).write_text(json.dumps(res))
+        cache.write_text(json.dumps(res), encoding="utf-8")
+    Path(a.out).write_text(json.dumps(res), encoding="utf-8")
     print(json.dumps({"out": a.out, "bpm": res["bpm"], "beats": len(res["times"]), "bars": len(res["downbeats"]),
                       "clarity": res["clarity"], "cached": cached}))
 

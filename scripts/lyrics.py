@@ -130,14 +130,14 @@ def main():
     ap.add_argument("lyrics", help="plain text, one lyric line per line")
     ap.add_argument("--out", required=True)
     a = ap.parse_args()
-    data = json.load(open(a.words))
+    data = json.load(open(a.words, encoding="utf-8"))
     lyr = read_lyrics(a.lyrics)
     if not lyr:
         sys.exit("lyrics.py: the lyrics file has no words")
     words, stats = align(data["words"], lyr)
     data["words"] = words
     data["lyrics"] = stats
-    json.dump(data, open(a.out, "w"), ensure_ascii=False, indent=1)
+    json.dump(data, open(a.out, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     if stats["coverage"] < 0.5:
         stats["warning"] = "under half of the lyric words were found in the audio: is this the right lyrics file?"
     print(json.dumps(stats, ensure_ascii=False))

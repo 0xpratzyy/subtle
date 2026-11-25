@@ -174,13 +174,13 @@ def main():
     ap.add_argument("--style", required=True)
     ap.add_argument("--out")
     a = ap.parse_args()
-    cap = json.load(open(a.captions))
-    style = json.load(open(a.style))
+    cap = json.load(open(a.captions, encoding="utf-8"))
+    style = json.load(open(a.style, encoding="utf-8"))
     try:
         notes, shots = apply(a.video, cap, style)
     except RuntimeError as e:
         sys.exit(f"shots.py: {e}")
-    json.dump(cap, open(a.out or a.captions, "w"), ensure_ascii=False, indent=1)
+    json.dump(cap, open(a.out or a.captions, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     for s in shots:
         print(f"{s['startMs'] / 1000:6.2f}-{s['endMs'] / 1000:6.2f}s  behind={s.get('behind')}  y={s.get('y')}  cover={s.get('cover')}  {s.get('reason', '')}", file=sys.stderr)
     print(json.dumps({"notes": notes, "shots": len(shots), "behind": sum(1 for s in shots if s.get("behind"))}))

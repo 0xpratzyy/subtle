@@ -418,10 +418,10 @@ def main():
     ap.add_argument("--palette", choices=["auto", "off"], default="auto")
     ap.add_argument("--legibility", choices=["auto", "off"], default="auto")
     a = ap.parse_args()
-    cap = json.loads(Path(a.captions).read_text())
-    style = json.loads(Path(a.style).read_text())
+    cap = json.loads(Path(a.captions).read_text(encoding="utf-8"))
+    style = json.loads(Path(a.style).read_text(encoding="utf-8"))
     analyse(cap, style, a.video, a.palette, a.legibility)
-    Path(a.out or a.captions).write_text(json.dumps(cap, ensure_ascii=False, indent=1))
+    Path(a.out or a.captions).write_text(json.dumps(cap, ensure_ascii=False, indent=1), encoding="utf-8")
     print(json.dumps({"legibility": cap.get("legibilitySummary"), "palette": cap.get("palette")}, ensure_ascii=False))
 
 

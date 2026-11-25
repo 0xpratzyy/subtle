@@ -51,12 +51,12 @@ def main():
     if a.order:
         names = a.order.split(",")
     else:
-        names = [json.loads(p.read_text()).get("name", p.stem) for p in sorted((root / "styles").glob("*.json"))]
+        names = [json.loads(p.read_text(encoding="utf-8")).get("name", p.stem) for p in sorted((root / "styles").glob("*.json"))]
         # the order of the published sheet: caption styles first, music styles last
-        music = [n for n in names if json.loads((root / "styles" / f"{n}.json").read_text()).get("group") == "music"]
+        music = [n for n in names if json.loads((root / "styles" / f"{n}.json").read_text(encoding="utf-8")).get("group") == "music"]
         names = [n for n in names if n not in music] + music
     names = [n for n in names if (d / f"{n}.mp4").exists()]
-    first = json.loads((d / f"{names[0]}.captions.json").read_text())["video"]
+    first = json.loads((d / f"{names[0]}.captions.json").read_text(encoding="utf-8"))["video"]
     tw = a.tile
     th = int(round(tw * first["height"] / first["width"] / 2) * 2)
     rows = (len(names) + a.cols - 1) // a.cols
@@ -66,7 +66,7 @@ def main():
     except Exception:
         font = ImageFont.load_default()
     for i, n in enumerate(names):
-        cap = json.loads((d / f"{n}.captions.json").read_text())
+        cap = json.loads((d / f"{n}.captions.json").read_text(encoding="utf-8"))
         im = grab(d / f"{n}.mp4", pick_time(cap, a.anchor), tw, th)
         dr = ImageDraw.Draw(im)
         dr.rectangle([0, 0, 8 * len(n) + 16, 24], fill=(0, 0, 0))
