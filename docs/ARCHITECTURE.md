@@ -44,7 +44,14 @@ fifth input, the blur mask (`--layer mask`): the source is blurred under it befo
 }
 ```
 
-`text` has no leading or trailing spaces; punctuation stays attached to its word.
+`text` has no leading or trailing spaces; punctuation stays attached to its word. `script` is `native` or `roman` and
+`engine` is `whisper` or `sarvam` (with `sarvam`, Whisper's words set the timing and Sarvam's words replace the text,
+spread over each piece by length in `map_onto_timing`).
+
+**Indian scripts in the renderer.** `fontWithGlyphs` in `engine/fonts.ts` draws, and measures, a word written in an
+Indian script or Urdu in the matching Noto font (`SCRIPT_FONTS`) at the style's weight, and `loadFonts` loads only the
+ones the captions use. `layoutPage` lays a page with Urdu out right to left. `letters()` keeps such a word whole in
+the styles that animate one letter at a time.
 
 ## captions.json
 

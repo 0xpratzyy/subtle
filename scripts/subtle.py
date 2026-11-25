@@ -107,9 +107,12 @@ def main():
                     help="auto: move each page off the face and the hands, within the style's position.flex range (macOS, Apple Vision); off: every page keeps the style's y")
     ap.add_argument("--cuts", choices=["auto", "off"], default="auto",
                     help="auto: find hard cuts with ffmpeg so no caption page straddles one; off: ignore cuts")
-    ap.add_argument("--lang", help="spoken language code (default: detect)")
+    ap.add_argument("--lang", help="spoken language code, e.g. en, es, hi, ta, te, kn, ml, bn, mr, gu, pa, ur, or (default: detect)")
     ap.add_argument("--vocab", default="", help="names and brand words, comma-separated")
-    ap.add_argument("--script", choices=["native", "roman"], default="native", help="roman: Hindi in Latin letters")
+    ap.add_argument("--script", choices=["native", "roman"], default="native",
+                    help="roman: an Indian language in Latin letters, the way people type it (Hinglish, Tanglish...)")
+    ap.add_argument("--engine", choices=["whisper", "sarvam"], default="whisper",
+                    help="sarvam: Sarvam AI writes the words for an Indian language (your own SARVAM_API_KEY; Whisper still times them)")
     ap.add_argument("--hinglish", action="store_true", help="short for --lang hi --script roman")
     ap.add_argument("--aspect", default="source", help="source (default), 9:16, 1:1, 4:5 or 16:9 (centre crop)")
     ap.add_argument("--max-words", type=int)
@@ -214,7 +217,7 @@ def main():
     elif a.words:
         shutil.copyfile(Path(a.words).expanduser(), words_path)
     else:
-        cmd = py(HERE / "transcribe.py") + [src, "--out", words_path, "--script", a.script]
+        cmd = py(HERE / "transcribe.py") + [src, "--out", words_path, "--script", a.script, "--engine", a.engine]
         if a.lang:
             cmd += ["--lang", a.lang]
         if a.vocab:

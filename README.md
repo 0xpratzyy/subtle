@@ -26,6 +26,11 @@ Say "the gold price is five thousand dollars" and the caption shows **$5,000**, 
 - **Numbers are written the way you would write them.** "five thousand dollars" and "$5000" become `$5,000`; "forty
   percent" becomes `40%`; "one lakh rupees" becomes `₹1 lakh`; years stay `1991`. An amount is one token: it is never
   split across two lines or two pages. Indian digit grouping (`₹15,00,000`) is used for rupee amounts and Hindi speech.
+- **Every Indian language.** Hindi, Marathi, Punjabi, Gujarati, Bengali, Odia, Tamil, Telugu, Kannada, Malayalam and
+  Urdu, in their own script or in Latin letters the way people type them (`--script roman`: "kya scene hai",
+  "enna seen da machi", "ki darun jayga re"). Every style draws the scripts in the matching Noto font at its own weight,
+  and Urdu reads right to left. `--engine sarvam` (your own `SARVAM_API_KEY`) lets Sarvam AI write the words for much
+  better accuracy on Indian and code-mixed speech; Whisper still times them. See [Indian languages](#indian-languages).
 - **Spanish works the same way.** "cinco mil dólares" becomes `$5,000`, "cuarenta por ciento" becomes `40%`, "dos mil
   veinticuatro" becomes `2024`, and the highlight rules use Spanish word lists. A transcript that already writes `5.000`
   and `3,5` keeps that convention; `--numbers european` or `--numbers western` forces one.
@@ -126,6 +131,9 @@ python3 scripts/subtle.py talk.mp4 --style ticket:yellow    # a colourway of a s
 python3 scripts/subtle.py talk.mp4 --style accent --emphasis-words 'gold, $5,000' --vocab "Meera, RBI"
 python3 scripts/subtle.py talk.mp4 --emphasis numbers       # highlight only numbers, prices, percentages and years
 python3 scripts/subtle.py talk.mp4 --hinglish               # Hindi written in Latin letters
+python3 scripts/subtle.py talk.mp4 --lang ta                # Tamil in Tamil script
+python3 scripts/subtle.py talk.mp4 --lang ta --script roman # Tamil in Latin letters ("enna seen da")
+SARVAM_API_KEY=... python3 scripts/subtle.py talk.mp4 --lang hi --engine sarvam   # Sarvam writes the words
 python3 scripts/subtle.py talk.mp4 --lang es                # Spanish (detected by itself when --lang is left out)
 python3 scripts/subtle.py talk.mp4 --aspect 9:16            # centre-crop first
 python3 scripts/subtle.py talk.mp4 --placement off --cuts off   # keep the style's own position, ignore cuts
@@ -135,6 +143,35 @@ python3 scripts/subtle.py talk.mp4 --captions talk.captions.json   # re-render a
 
 The transcript is cached by the file's hash, so trying another style does not transcribe again.
 
+## Indian languages
+
+| `--lang` | Language | `--script native` | `--script roman` |
+|---|---|---|---|
+| `hi` | Hindi | भाई ये जगह मस्त है | bhai yeh jagah mast hai |
+| `mr` | Marathi | काय सीन आहे | kaay seen aahe |
+| `pa` | Punjabi | ਕੀ ਸੀਨ ਆ | ki seen aa |
+| `gu` | Gujarati | સીન છે | seen chhe |
+| `bn` | Bengali | কি দারুণ জায়গা রে | ki darun jayga re |
+| `or` | Odia (`--engine sarvam`) | କି ସିନ୍ ଭଲ | ki sin bhala |
+| `ta` | Tamil | என்ன சீன் டா மச்சி | enna seen da machi |
+| `te` | Telugu | సీన్ రా బావ | seen ra baava |
+| `kn` | Kannada | ಸೀನ್ ಗುರು | seen guru |
+| `ml` | Malayalam | എന്ത് സീൻ | enthu seen |
+| `ur` | Urdu | کیا سین ہے یار | kya scene hai yaar |
+
+- **Native script.** A word in an Indian script or Urdu is drawn in the matching Noto font (`fonts/Noto*`, variable
+  weight) at the style's weight; Latin words in the same caption keep the style's own font, so code-mixed captions
+  ("India और Bangladesh") look right. Urdu pages are laid out right to left. Styles that animate letter by letter keep
+  these words whole, so conjuncts and joined letters never break.
+- **Latin letters.** Whisper writes each language in its own script and Subtle spells it the way people type it: the
+  silent final "a" of Hindi is dropped (ghar), Bengali keeps its "o" (kemon), Tamil types ச as "s" and ட as "d"
+  (seen da), Malayalam says a final ് as "u" (enthu). Hindi has a list of the most common words as people type them
+  (nahi, bahut, zyada, accha) and fixes Whisper's own variants (nahin, bohot). Roman Urdu follows the Hindi path.
+- **Sarvam.** `--engine sarvam` sends the audio, in pieces of at most 25 s, to [Sarvam AI](https://www.sarvam.ai)'s
+  speech-to-text (`saaras:v4`) with your own `SARVAM_API_KEY`, and places its words on Whisper's timings. In
+  `--script native` English words stay in English letters, the way creators write mixed speech. This is the only
+  part of Subtle that uploads anything, and it runs only when you ask for it.
+
 ## Limits
 
 - The behind-the-speaker effect (`keyword`, `cover`, `outline`, `poster`, `rise`, `numeral`) works best with one person and a steady camera. Fine hair, fast hand
@@ -142,8 +179,10 @@ The transcript is cached by the file's hash, so trying another style does not tr
   would look bad.
 - Styles without a container (soft-shadow text) can be hard to read on bright or busy footage; the check warns about
   low contrast and suggests `glass`, `chip` or `block`.
-- Whisper spells Hindi words in Latin letters unevenly. Read the transcript before rendering and fix words with
-  `--replace heard=Shown`.
+- Whisper spells Indian languages in Latin letters unevenly, and hears code-mixed speech less well than Sarvam. Read
+  the transcript before rendering and fix words with `--replace heard=Shown`, or use `--engine sarvam`.
+- Odia needs `--engine sarvam`: Whisper does not know it.
+- Noto Nastaliq (Urdu) has tall letters that can reach above a tight container (`block`, `chip`).
 - A giant number is never put behind the speaker in `keyword` (hidden digits would change it): it is drawn in front. `numeral` is built for numerals behind the speaker.
 - Word timings come from Whisper's attention, not forced alignment. They are usually within a frame or two; very fast
   speech can drift.

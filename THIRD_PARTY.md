@@ -1,6 +1,7 @@
 # Third-party software, models and fonts
 
-Subtle's own code is MIT (see `LICENSE`). It calls or bundles the items below. Nothing here needs an API key.
+Subtle's own code is MIT (see `LICENSE`). It calls or bundles the items below. Nothing here needs an API key, except
+the optional Sarvam engine.
 
 ## Bundled in this repository
 
@@ -22,9 +23,12 @@ Subtle's own code is MIT (see `LICENSE`). It calls or bundles the items below. N
 | Corben (Bold) | SIL Open Font License 1.1 | `fonts/`, `fonts/OFL-Corben.txt` |
 | Gloria Hallelujah | SIL Open Font License 1.1 | `fonts/`, `fonts/OFL-GloriaHallelujah.txt` |
 | Reenie Beanie | SIL Open Font License 1.1 | `fonts/`, `fonts/OFL-ReenieBeanie.txt` |
+| Noto Sans Devanagari, Bengali, Gurmukhi, Gujarati, Oriya, Tamil, Telugu, Kannada, Malayalam (variable weight) | SIL Open Font License 1.1 | `fonts/`, `fonts/OFL-NotoSans*.txt` |
+| Noto Nastaliq Urdu (variable weight) | SIL Open Font License 1.1 | `fonts/`, `fonts/OFL-NotoNastaliqUrdu.txt` |
 
 The Montserrat and Inter files are static weights cut from the upstream variable fonts with fontTools
-(`fonttools varLib.instancer`), with the family name set to match the weight. All other font files are unmodified
+(`fonttools varLib.instancer`), with the family name set to match the weight. The Noto Sans files keep their weight
+axis; their width axis is pinned to 100 with the same tool, which makes them about a third smaller. All other font files are unmodified
 copies from https://github.com/google/fonts.
 
 ## Installed or called at run time (not bundled)
@@ -38,6 +42,7 @@ copies from https://github.com/google/fonts.
 | ffmpeg / ffprobe | LGPL or GPL depending on the build | must already be installed; used for audio extraction, compositing and frame grabs |
 | Apple Vision framework | part of macOS | person segmentation for behind mode (`scripts/vision-matte`) and face/hand detection for placement (`scripts/vision-subject`) |
 | NumPy (BSD-3-Clause), Pillow (MIT-CMU) | as stated | `scripts/verify.py` (both) and `scripts/beats.py` (NumPy) |
+| Sarvam AI speech-to-text (`saaras:v4`), optional | Sarvam's API terms, your own key | only with `--engine sarvam` and `SARVAM_API_KEY`: the audio is sent to Sarvam to write the words of an Indian language. Off by default. |
 
 ## Optional, never bundled and never called by default
 

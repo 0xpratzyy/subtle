@@ -22,7 +22,7 @@ uploaded and no key is needed. Run commands from this skill's folder (the folder
 | behind | `auto` | `auto`: with `--style keyword`, put the giant word behind the speaker if the subject check passes. `on`: force it. `off`: draw it in front |
 | placement | `auto` | `auto`: each page moves off the face and the hands (macOS, Apple Vision), inside the style's `position.flex` range, and only when it has to. `off`: every page keeps the style's `y` |
 | cuts | `auto` | `auto`: find hard cuts with ffmpeg; no page straddles one. `off`: ignore cuts |
-| language | detect | `--lang en`, `--lang hi`, `--lang es`; `--hinglish` writes Hindi in Latin letters. Spanish has its own number and highlight rules |
+| language | detect | `--lang en`, `--lang es`, or an Indian language: `hi mr pa gu bn or ta te kn ml ur`; `--script roman` writes it in Latin letters the way people type it (`--hinglish` = `--lang hi --script roman`); `--engine sarvam` uses Sarvam AI for the words (needs `SARVAM_API_KEY`, required for Odia). Spanish has its own number and highlight rules |
 | vocab | none | names and brand words Whisper should spell right: `--vocab "Refs, Claude"` |
 | legibility | `auto` | `auto`: measure what is behind every page and add a soft halo, scrim or outline where the type would not read; clean dark footage is left untouched. `off`: draw the preset as it is |
 | palette | `auto` | `auto`: styles with an accent colour (`glide`, `keyword`, `shine`, `accent`, `hype`, `highlighter`, `haiku`, `karaoke`) take it from the footage: a colour that suits the scene and reads on it. `off`: the preset's colours |
@@ -37,7 +37,8 @@ If the user did not name a style, use `glide` and say which other styles exist. 
 2. **Transcribe.** `python3 scripts/subtle.py "<video>" --stop-after transcribe [--lang ..] [--vocab ".."] [--hinglish]`
    It prints the transcript. Read it.
    - Fix wrong names with `--replace heard=Shown` (repeatable) or better `--vocab`.
-   - For Hindi or Hinglish, check names and transliteration against the audio. Flag uncertain words.
+   - For an Indian language (or Hinglish), check names and spelling against the audio. Flag uncertain words. If the
+     user has a `SARVAM_API_KEY`, suggest `--engine sarvam` for noticeably better Indian and code-mixed text.
 3. **Group.** `python3 scripts/subtle.py "<video>" --style <style> --stop-after group`.
    Keep the transcription flags from step 2. For a song, pass the chosen music style and any supplied
    `--lyrics <file>` and `--canvas <ratio>`. For video, add the requested `--aspect` if needed.
