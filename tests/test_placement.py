@@ -15,7 +15,7 @@ WORDS = ROOT / "tests" / "sample-words.json"
 
 
 def style(name="bottom", **pos):
-    st = json.loads((ROOT / "styles" / f"{name}.json").read_text())
+    st = json.loads((ROOT / "styles" / f"{name}.json").read_text(encoding="utf-8"))
     st["position"].update(pos)
     return st
 
@@ -124,7 +124,7 @@ def main():
         cuts = [1500, 3300, 9000]
         subprocess.run([sys.executable, str(ROOT / "scripts" / "group.py"), str(WORDS), "--style", str(ROOT / "styles" / "glass.json"),
                         "--out", str(outp), "--cuts", ",".join(map(str, cuts))], check=True, capture_output=True)
-        cap = json.loads(outp.read_text())
+        cap = json.loads(outp.read_text(encoding="utf-8"))
         check(cap.get("cuts") == cuts, "captions.json carries `cuts`")
         for p in cap["pages"]:
             lo, hi = C.shot_bounds(cuts, (p["words"][0]["startMs"] + p["words"][0]["endMs"]) / 2)
@@ -135,7 +135,7 @@ def main():
         plain = Path(tmp) / "p.json"
         subprocess.run([sys.executable, str(ROOT / "scripts" / "group.py"), str(WORDS), "--style", str(ROOT / "styles" / "glass.json"), "--out", str(plain)],
                        check=True, capture_output=True)
-        check("cuts" not in json.loads(plain.read_text()), "no cuts, no `cuts` key")
+        check("cuts" not in json.loads(plain.read_text(encoding="utf-8")), "no cuts, no `cuts` key")
 
     if failures:
         print("FAILED:\n  " + "\n  ".join(failures))

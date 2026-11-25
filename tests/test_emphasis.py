@@ -172,11 +172,11 @@ def main():
     line = "The gold price is five thousand dollars today. It is up forty percent since 1991 and nobody saw it coming."
     with tempfile.TemporaryDirectory() as tmp:
         wj, cj = Path(tmp) / "words.json", Path(tmp) / "captions.json"
-        wj.write_text(json.dumps({"source": src, "language": "en", "words": words(line, 400)}))
+        wj.write_text(json.dumps({"source": src, "language": "en", "words": words(line, 400)}), encoding="utf-8")
         for style in ("glide", "bottom", "keyword", "title"):
             sj = ROOT / "styles" / f"{style}.json"
             subprocess.run([sys.executable, str(ROOT / "scripts" / "group.py"), str(wj), "--style", str(sj), "--out", str(cj)], check=True, capture_output=True)
-            cap = json.loads(cj.read_text())
+            cap = json.loads(cj.read_text(encoding="utf-8"))
             flat = [w for p in cap["pages"] for w in p["words"]]
             check(any(w["text"] == "$5,000" and w["emphasis"] and w.get("reason") == "price" for w in flat), f"{style}: '$5,000' is not one highlighted token")
             check(any(w["text"] == "40%" and w["emphasis"] for w in flat), f"{style}: '40%' is not highlighted")
@@ -187,10 +187,10 @@ def main():
                 check(any(b["text"] in ("$5,000", "40%", "1991") for b in cap.get("big", [])), "keyword: no number among the giant words")
         # Spanish through group.py: the language in words.json picks the rules; pages do not end on "de" or "el"
         line = "Eh, el precio del oro es de cinco mil dólares hoy. Subió un cuarenta por ciento y nadie lo vio venir."
-        wj.write_text(json.dumps({"source": src, "language": "es", "words": words(line, 400)}))
+        wj.write_text(json.dumps({"source": src, "language": "es", "words": words(line, 400)}), encoding="utf-8")
         subprocess.run([sys.executable, str(ROOT / "scripts" / "group.py"), str(wj), "--style", str(ROOT / "styles" / "glide.json"),
                         "--out", str(cj), "--clean"], check=True, capture_output=True)
-        cap = json.loads(cj.read_text())
+        cap = json.loads(cj.read_text(encoding="utf-8"))
         flat = [w for p in cap["pages"] for w in p["words"]]
         check(any(w["text"] == "$5,000" and w["emphasis"] for w in flat) and any(w["text"] == "40%" and w["emphasis"] for w in flat),
               f"Spanish: '$5,000' and '40%' must be highlighted tokens, got {[w['text'] for w in flat]}")
@@ -198,22 +198,22 @@ def main():
         ends = [p["words"][-1]["text"].lower() for p in cap["pages"] if len(p["words"]) > 1]
         check(not any(e in ("el", "del", "de", "un", "y", "lo") for e in ends), f"Spanish: a page ends on a weak word: {ends}")
         wj.write_text(json.dumps({"source": src, "language": "en", "words": words(
-            "The gold price is five thousand dollars today. It is up forty percent since 1991 and nobody saw it coming.", 400)}))
+            "The gold price is five thousand dollars today. It is up forty percent since 1991 and nobody saw it coming.", 400)}), encoding="utf-8")
         subprocess.run([sys.executable, str(ROOT / "scripts" / "group.py"), str(wj), "--style", str(ROOT / "styles" / "title.json"),
                         "--out", str(cj)], check=True, capture_output=True)
         # picks by hand: one page, by word text; then drop one
-        cap = json.loads(cj.read_text())
+        cap = json.loads(cj.read_text(encoding="utf-8"))
         page = next(i for i, p in enumerate(cap["pages"]) if any("nobody" in w["text"] for w in p["words"]))
         r = subprocess.run([sys.executable, str(ROOT / "scripts" / "emphasis.py"), str(cj), "--style", "title", "--clear",
                             "--pick", f"{page}:nobody=the surprise", "--show"], capture_output=True, text=True)
         check(r.returncode == 0 and "[nobody]" in r.stdout and "the surprise" in r.stdout, f"emphasis.py --pick failed: {r.stdout} {r.stderr}")
-        cap = json.loads(cj.read_text())
+        cap = json.loads(cj.read_text(encoding="utf-8"))
         flagged = [(w["text"], w.get("reason")) for p in cap["pages"] for w in p["words"] if w["emphasis"]]
         check(flagged == [("nobody", "the surprise")], f"emphasis.py --clear --pick left {flagged}")
         r = subprocess.run([sys.executable, str(ROOT / "scripts" / "emphasis.py"), str(cj), "--pick", "999:nope=x"], capture_output=True, text=True)
         check(r.returncode != 0, "emphasis.py must refuse a pick on a page that does not exist")
         r = subprocess.run([sys.executable, str(ROOT / "scripts" / "emphasis.py"), str(cj), "--drop", f"{page}:nobody"], capture_output=True, text=True)
-        cap = json.loads(cj.read_text())
+        cap = json.loads(cj.read_text(encoding="utf-8"))
         check(not any(w["emphasis"] for p in cap["pages"] for w in p["words"]), "emphasis.py --drop did not remove the highlight")
 
     if failures:

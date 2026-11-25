@@ -40,6 +40,15 @@ def has_picture(path):
     return any(not (x.get("disposition") or {}).get("attached_pic") for x in json.loads(out).get("streams", []))
 
 
+def find_bash():
+    # Windows: a bare "bash" resolves to WSL's System32\bash.exe, which mangles Windows paths; use the one that ships with Git
+    git = shutil.which("git") if sys.platform == "win32" else None
+    for up in ([Path(git).resolve().parents[n] for n in (1, 2)] if git else ()):
+        if (up / "bin" / "bash.exe").exists():
+            return up / "bin" / "bash.exe"
+    return "bash"
+
+
 def run(cmd, **kw):
     r = subprocess.run([str(c) for c in cmd], capture_output=True, text=True, **kw)
     if r.returncode != 0:
@@ -137,7 +146,7 @@ def main():
     a = ap.parse_args()
 
     if a.list_styles:
-        all_styles = [json.loads(p.read_text()) for p in sorted((ROOT / "styles").glob("*.json"))]
+        all_styles = [json.loads(p.read_text(encoding="utf-8")) for p in sorted((ROOT / "styles").glob("*.json"))]
         for title, pick in (("Caption styles", lambda st: st.get("group") != "music"), ("Music / lyric styles (pages start on the beat)", lambda st: st.get("group") == "music")):
             rows = [st for st in all_styles if pick(st)]
             if rows:
@@ -172,7 +181,7 @@ def main():
     if not style_path.exists():
         names = sorted(p.stem for p in (ROOT / "styles").glob("*.json"))
         sys.exit(f"subtle: unknown style '{style_name}'. Styles: {', '.join(names)}")
-    style = json.loads(style_path.read_text())
+    style = json.loads(style_path.read_text(encoding="utf-8"))
     if variant:  # a colourway: the preset with a few keys replaced
         variants = style.get("variants") or {}
         if variant not in variants:
@@ -180,7 +189,7 @@ def main():
         style = deep_merge(style, variants[variant])
         style["variant"] = variant
         style_path = work / "style.json"
-        style_path.write_text(json.dumps(style, indent=1))
+        style_path.write_text(json.dumps(style, indent=1), encoding="utf-8")
     music = style.get("group") == "music" or (style.get("page") or {}).get("snap") in ("beat", "bar")
 
     # ---- a song or a voice memo has no picture: make a plain canvas for the captions to sit on ----
@@ -232,11 +241,11 @@ def main():
         notes.append(f"lyrics file: {ly.get('matched', 0)} of {ly.get('lyricWords', 0)} words found in the audio, {ly.get('notHeard', 0)} never sung here, "
                      f"{ly.get('keptAsHeard', 0)} sung words kept as transcribed" + ("; " + ly["warning"] if ly.get("warning") else ""))
     if not a.captions:
-        data = json.loads(words_path.read_text())
+        data = json.loads(words_path.read_text(encoding="utf-8"))
         if video != src:  # the crop or the canvas changed the frame size, not the timing
             w, h = probe_size(video)
             data["source"].update(width=w, height=h)
-            words_path.write_text(json.dumps(data, ensure_ascii=False, indent=1))
+            words_path.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
         transcript = " ".join(w["text"] for w in data["words"])
         if a.stop_after == "transcribe":
             print(json.dumps({"words": str(words_path), "language": data.get("language"), "transcript": transcript, "seconds": times}, ensure_ascii=False))
@@ -248,7 +257,7 @@ def main():
     check = None
     if a.behind == "on" and not wants_behind:
         style_path = ROOT / "styles" / "keyword.json"
-        style = json.loads(style_path.read_text())
+        style = json.loads(style_path.read_text(encoding="utf-8"))
         wants_behind = True
         notes.append("--behind on: switched to the keyword style")
     if wants_behind and a.behind != "off":
@@ -270,7 +279,7 @@ def main():
                     # numbers are drawn in front, below the face: about a third of the frame under the head band
                     style["behind"]["frontY"] = round(min(70.0, max(52.0, style["behind"]["bigY"] + 32.0)), 1)
                     style_path = work / "style.json"
-                    style_path.write_text(json.dumps(style, indent=1))
+                    style_path.write_text(json.dumps(style, indent=1), encoding="utf-8")
                     notes.append(f"big words placed at {style['behind']['bigY']}% of the height (the person covers {int(float(check.get('bandCoverage', 0)) * 100)}% of that band)")
             else:
                 notes.append(f"behind mode skipped: {check.get('reason', 'subject check failed')}; the big words are drawn in front of the speaker instead")
@@ -280,14 +289,14 @@ def main():
     cuts = []
     if not a.captions and not music and not audio_only and a.cuts == "auto":
         stamp = [video.name, video.stat().st_size, int(video.stat().st_mtime)]
-        cached = json.loads(cuts_path.read_text()) if cuts_path.exists() else {}
+        cached = json.loads(cuts_path.read_text(encoding="utf-8")) if cuts_path.exists() else {}
         if cached.get("stamp") != stamp:
             with step("cuts"):
                 found = last_json(run([sys.executable, HERE / "cuts.py", video, "--fps", str(probe_fps(video))]))
                 if found.get("error"):
                     notes.append(f"cut detection skipped: {found['error']}")
                 cached = {"stamp": stamp, "cuts": found.get("cuts", [])}
-                cuts_path.write_text(json.dumps(cached))
+                cuts_path.write_text(json.dumps(cached), encoding="utf-8")
         cuts = cached.get("cuts", [])
         if cuts:
             notes.append(f"{len(cuts)} hard cut(s) found: pages are split at them")
@@ -326,7 +335,7 @@ def main():
     # ---- placement: keep each page off the face and the hands ----
     placement = None
     if a.placement == "auto" and not audio_only and not music:
-        cap = json.loads(cap_path.read_text())
+        cap = json.loads(cap_path.read_text(encoding="utf-8"))
         if a.captions and any("y" in p for p in cap["pages"]):
             notes.append("placement: the given captions already carry page positions (y); kept as they are")
         else:
@@ -338,7 +347,7 @@ def main():
                     try:
                         pnotes, placement = pl.apply(video, cap, style, cap.get("cuts") or [])
                         notes += pnotes
-                        cap_path.write_text(json.dumps(cap, ensure_ascii=False, indent=1))
+                        cap_path.write_text(json.dumps(cap, ensure_ascii=False, indent=1), encoding="utf-8")
                         if placement.get("pages"):
                             notes.append(f"placement: {placement['moved']} of {placement['pages']} pages moved off the preset y ({placement['changes']} position changes)")
                     except (RuntimeError, OSError) as e:
@@ -346,7 +355,7 @@ def main():
     # ---- behind mode, per shot: a close-up fills the frame, a wide shot leaves room. Decided for each shot, not once for the video ----
     needs_subject = bool(style.get("subject"))  # a front style that places words around the face (split) reads the same timeline
     if ((wants_behind and a.behind != "off") or needs_subject) and not music and not audio_only and sys.platform == "darwin":
-        cap = json.loads(cap_path.read_text())
+        cap = json.loads(cap_path.read_text(encoding="utf-8"))
         if cap.get("cuts") or cap.get("shots") or needs_subject:
             import shots as sh
             with step("shots"):
@@ -356,7 +365,7 @@ def main():
                         snotes = []
                     else:
                         snotes, _ = sh.apply(video, cap, style)
-                    cap_path.write_text(json.dumps(cap, ensure_ascii=False, indent=1))
+                    cap_path.write_text(json.dumps(cap, ensure_ascii=False, indent=1), encoding="utf-8")
                     notes += snotes
                     if wants_behind and a.behind != "off":
                         use_behind = a.behind == "on" or any(x.get("behind") for x in cap["shots"])
@@ -368,7 +377,7 @@ def main():
     if cap_path.resolve() != user_cap.resolve():
         shutil.copyfile(cap_path, user_cap)
     # ---- legibility: what is behind each page, and a palette from the footage (after grouping, before the render) ----
-    style_dict = json.loads(style_path.read_text())
+    style_dict = json.loads(style_path.read_text(encoding="utf-8"))
     if a.legibility != "off" or (a.palette != "off" and has_auto(style_dict)):
         with step("legibility"):
             lg = last_json(run(py(HERE / "legibility.py") + [cap_path, "--style", style_path, "--video", video,
@@ -379,7 +388,7 @@ def main():
             notes.append(f"legibility ({s_['mode']}): {s_['boosted']} of {s_['pages']} pages need help, mean boost {s_['meanBoost']}, weakest contrast {s_['minContrast']}:1")
         if lg.get("palette"):
             notes.append(f"palette from the footage: accent {lg['palette']['accent']} ({lg['palette']['contrast']}:1 on the scene)")
-    cap = json.loads(cap_path.read_text())
+    cap = json.loads(cap_path.read_text(encoding="utf-8"))
     picks = [f"{i}: {w['text']}" + (f" ({w['reason']})" if w.get("reason") else "") for i, p in enumerate(cap["pages"]) for w in p["words"] if w.get("emphasis")]
     if a.stop_after == "group":
         print(json.dumps({"captions": str(user_cap), "style": style["name"], "pages": len(cap["pages"]), "highlighted": picks,
@@ -413,13 +422,13 @@ def main():
             with step("render"):
                 run(render + ["--layer", "behind", "--out", ob])
         with step("composite"):
-            run(["bash", HERE / "composite.sh", "--video", video, "--behind", ob, "--matte", matte, "--front", of, "--out", out, "--crf", a.crf])
+            run([find_bash(), HERE / "composite.sh", "--video", video, "--behind", ob, "--matte", matte, "--front", of, "--out", out, "--crf", a.crf])
         vcmd = py(HERE / "verify.py") + ["--video", out, "--source", video, "--captions", cap_path, "--style", style_path,
                                         "--overlay", of, "--behind", ob, "--matte", matte, "--out", preview]
         notes.append(f"matte: {minfo.get('msPerFrame', '?')} ms per frame at {minfo.get('quality', a.matte_quality)}")
     else:
         ov = work / "overlay.mov"
-        comp = ["bash", HERE / "composite.sh", "--video", video, "--overlay", ov, "--out", out, "--crf", a.crf]
+        comp = [find_bash(), HERE / "composite.sh", "--video", video, "--overlay", ov, "--out", out, "--crf", a.crf]
         with step("render"):
             run(render + ["--layer", "all", "--out", ov])
             blur = float(style.get("backdropBlur") or ((style.get("recipe") or {}).get("plate") or {}).get("backdropBlur") or 0)
