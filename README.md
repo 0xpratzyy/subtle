@@ -2,8 +2,9 @@
 
 Animated captions for talking-head video, rendered locally.
 
-Subtle is a skill for Codex and Claude Code, with a standalone CLI. Give it a video to transcribe and animate
+Subtle is a skill for OpenCode, Codex and Claude Code, with a standalone CLI. Give it a video to transcribe and animate
 captions in one of 35 styles. It runs on your machine without uploading the footage or asking for an API key.
+Windows is supported with `faster-whisper`; Apple Silicon Macs can use `mlx-whisper` automatically.
 
 **See every style on a real clip: https://subtle.refs.video** (the showcase site runs the same caption engine in the
 browser; its source is in `site/`).
@@ -57,7 +58,7 @@ Say "the gold price is five thousand dollars" and the caption shows **$5,000**, 
 
 ## What it does
 
-1. Transcribes the speech with word-level timing (Whisper large-v3-turbo through `mlx-whisper`).
+1. Transcribes speech with word-level timing (Whisper large-v3-turbo through `faster-whisper`, or `mlx-whisper` on Apple Silicon).
 2. Writes spoken numbers as single tokens (`$5,000`, `40%`, `₹1 lakh`), groups the words into short, readable pages
    and highlights the words that matter.
 3. Renders the captions in the style you pick, at the video's own size and frame rate.
@@ -81,6 +82,22 @@ git clone https://github.com/0xpratzyy/subtle ~/.agents/skills/subtle
 git clone https://github.com/0xpratzyy/subtle ~/.claude/skills/subtle
 ```
 
+**OpenCode** (macOS/Linux):
+
+```bash
+git clone https://github.com/0xpratzyy/subtle ~/.config/opencode/skills/subtle
+```
+
+**OpenCode** (Windows PowerShell):
+
+```powershell
+git clone https://github.com/0xpratzyy/subtle "$env:USERPROFILE\.config\opencode\skills\subtle"
+```
+
+OpenCode discovers the skill from its `SKILL.md` in that folder. On Windows, install ffmpeg, Node 18+, Python 3.9+,
+and `uv`. The default transcription backend is
+`faster-whisper`; use `--model small` on a slower CPU. See the platform notes below for features that need macOS.
+
 Then ask your agent to *"add captions to ~/Movies/talk.mp4"* or *"put a giant keyword behind me"*.
 For the standalone CLI, clone the repo anywhere and run the commands below from that directory.
 
@@ -88,16 +105,16 @@ For the standalone CLI, clone the repo anywhere and run the commands below from 
 
 | Need | For | Install |
 |---|---|---|
-| macOS on Apple Silicon | transcription (`mlx-whisper`) and the behind-the-speaker effect (Apple Vision) | |
-| ffmpeg | reading and writing video | `brew install ffmpeg` |
-| Node 18 or newer | the caption renderer | `brew install node` |
-| Python 3.9 or newer and `uv` | transcription and visual checks | `brew install uv` |
+| macOS on Apple Silicon | optional `mlx-whisper` backend and the behind-the-speaker effect (Apple Vision) | |
+| ffmpeg | reading and writing video | `brew install ffmpeg` / `winget install ffmpeg` |
+| Node 18 or newer | the caption renderer | `brew install node` / `winget install OpenJS.NodeJS.LTS` |
+| Python 3.9 or newer and `uv` | transcription and visual checks | `brew install uv` / `winget install astral-sh.uv` |
 | Swift (Xcode command line tools) | the behind-the-speaker styles and smart placement | `xcode-select --install` |
 
-`bash scripts/doctor.sh` checks all of this and prints what is missing. The first run downloads the speech model (about
+`python scripts/doctor.py` checks all of this and prints what is missing on Windows; `bash scripts/doctor.sh` remains available on macOS/Linux. The first run downloads the speech model (about
 1.6 GB) and installs the renderer's packages (about a minute). On Linux or Intel Macs you can still render captions
 from your own word timings (`--words`). Run `bash scripts/doctor.sh --from-timings` for this workflow.
-Without `uv`, install `mlx-whisper` for transcription and `numpy` and `pillow` for visual checks
+Without `uv`, install `faster-whisper` (or `mlx-whisper` on Apple Silicon) for transcription and `numpy` and `pillow` for visual checks
 in the Python environment that runs Subtle.
 
 ## Styles
@@ -139,6 +156,13 @@ python3 scripts/subtle.py talk.mp4 --aspect 9:16            # centre-crop first
 python3 scripts/subtle.py talk.mp4 --placement off --cuts off   # keep the style's own position, ignore cuts
 python3 scripts/subtle.py talk.mp4 --behind off             # draw giant words in front, never behind
 python3 scripts/subtle.py talk.mp4 --captions talk.captions.json   # re-render after editing the captions
+```
+
+On Windows PowerShell, use `python` and an absolute path, for example:
+
+```powershell
+python scripts/subtle.py "C:\Users\you\Videos\talk.mp4" --style glass
+python scripts/subtle.py "C:\Users\you\Videos\talk.mp4" --style glass --captions "C:\Users\you\Videos\talk.captions.json"
 ```
 
 The transcript is cached by the file's hash, so trying another style does not transcribe again.

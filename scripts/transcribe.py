@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # /// script
 # requires-python = ">=3.9"
-# dependencies = ["mlx-whisper>=0.4"]
+# dependencies = ["faster-whisper>=1.1", "mlx-whisper>=0.4; sys_platform == 'darwin' and platform_machine == 'arm64'"]
 # ///
-"""Transcribe a video to word timings with mlx-whisper (Apple Silicon, local, free).
+"""Transcribe a video locally with faster-whisper or mlx-whisper on Apple Silicon.
 
     uv run scripts/transcribe.py video.mp4 --out words.json [--lang en] [--vocab "Refs, Claude"] [--script roman]
 
-Without uv: `pip install mlx-whisper`, then run it with python3.
+Without uv: `pip install faster-whisper`, then run it with python.
 The result is cached by the file's SHA-256, so a second run on the same video returns at once.
 """
 import argparse
@@ -21,7 +21,10 @@ import time
 from pathlib import Path
 
 DEFAULT_MODEL = "mlx-community/whisper-large-v3-turbo"
-CACHE_VERSION = 4  # bump when the transcription or spelling logic changes, so old cache entries are not reused
+FASTER_MODEL = "large-v3-turbo"
+MLX_MODELS = {name: f"mlx-community/whisper-{name}" for name in ("tiny", "base", "small", "medium", "large-v3")}
+MLX_MODELS["large-v3-turbo"] = DEFAULT_MODEL
+CACHE_VERSION = 5  # bump when transcription or spelling logic changes, so old cache entries are not reused
 
 
 def sha256(path, chunk=1 << 20):
@@ -355,8 +358,66 @@ def sarvam_words(wav, whisper_words, key, lang_code, script):
         return [w for chunk in pool.map(run, pieces) for w in chunk]
 
 
+def pick_backend(requested):
+    """Use mlx on Apple Silicon when installed; faster-whisper is the portable default."""
+    if requested != "auto":
+        return requested
+    import platform
+    if sys.platform == "darwin" and platform.machine() == "arm64":
+        try:
+            import mlx_whisper  # noqa: F401
+            return "mlx"
+        except ImportError:
+            pass
+    return "faster"
+
+
+def run_mlx(wav, a, hints):
+    try:
+        import mlx_whisper
+    except ImportError:
+        sys.exit("transcribe.py: mlx-whisper is not installed. Use --backend faster, or `pip install mlx-whisper`.")
+    kwargs = dict(path_or_hf_repo=a.model, word_timestamps=True, condition_on_previous_text=False, verbose=None)
+    if a.whisper_lang:
+        kwargs["language"] = a.whisper_lang
+    if hints:
+        kwargs["initial_prompt"] = " ".join(hints)
+    result = mlx_whisper.transcribe(str(wav), **kwargs)
+    segments = [[{"word": w.get("word") or "", "start": float(w["start"]), "end": float(w["end"]),
+                  "probability": float(w.get("probability", 0))} for w in (seg.get("words") or [])]
+                for seg in result.get("segments", [])]
+    return segments, result.get("language") or a.whisper_lang
+
+
+def run_faster(wav, a, hints):
+    try:
+        from faster_whisper import WhisperModel
+    except ImportError:
+        sys.exit("transcribe.py: faster-whisper is not installed. Run with `uv run`, or `pip install faster-whisper`.")
+    device = a.device
+    if device == "auto":
+        try:
+            import ctranslate2
+            device = "cuda" if ctranslate2.get_cuda_device_count() else "cpu"
+        except Exception:
+            device = "cpu"
+    compute = a.compute_type
+    if compute == "auto":
+        compute = "float16" if device == "cuda" else "int8"
+    model = WhisperModel(a.model, device=device, compute_type=compute)
+    kwargs = dict(word_timestamps=True, condition_on_previous_text=False, vad_filter=a.vad, beam_size=5)
+    if a.whisper_lang:
+        kwargs["language"] = a.whisper_lang
+    if hints:
+        kwargs["initial_prompt"] = " ".join(hints)
+    segments, info = model.transcribe(str(wav), **kwargs)
+    normalized = [[{"word": w.word or "", "start": float(w.start), "end": float(w.end),
+                    "probability": float(w.probability)} for w in (seg.words or [])] for seg in segments]
+    return normalized, info.language or a.whisper_lang
+
+
 def main():
-    ap = argparse.ArgumentParser(description="Word-level transcription with mlx-whisper.")
+    ap = argparse.ArgumentParser(description="Word-level transcription with faster-whisper or mlx-whisper.")
     ap.add_argument("video")
     ap.add_argument("--out", help="where to write words.json (default: the cache folder)")
     ap.add_argument("--lang", help="language code, e.g. en, es, or an Indian one: " + ", ".join(INDIAN) + " (default: detect)")
@@ -366,13 +427,21 @@ def main():
     ap.add_argument("--engine", choices=["whisper", "sarvam"], default="whisper",
                     help="sarvam: Sarvam AI writes the words for an Indian language (needs SARVAM_API_KEY; Whisper still times them)")
     ap.add_argument("--hinglish", action="store_true", help="short for --lang hi --script roman")
-    ap.add_argument("--model", default=DEFAULT_MODEL)
+    ap.add_argument("--model", default=os.environ.get("SUBTLE_MODEL"), help="model name (default large-v3-turbo; use small on a slow CPU)")
+    ap.add_argument("--backend", choices=["auto", "faster", "mlx"], default="auto")
+    ap.add_argument("--device", choices=["auto", "cpu", "cuda"], default="auto")
+    ap.add_argument("--compute-type", choices=["auto", "int8", "int8_float16", "float16", "float32"], default="auto")
+    ap.add_argument("--vad", action="store_true", help="skip silence (speech only; not for singing)")
     ap.add_argument("--cache-dir", default=os.environ.get("SUBTLE_CACHE", str(Path.home() / ".cache" / "subtle")))
     ap.add_argument("--no-cache", action="store_true")
     a = ap.parse_args()
 
     if a.hinglish:
         a.lang, a.script = a.lang or "hi", "roman"
+    a.backend = pick_backend(a.backend)
+    a.model = a.model or (DEFAULT_MODEL if a.backend == "mlx" else FASTER_MODEL)
+    if a.backend == "mlx" and a.model in MLX_MODELS:
+        a.model = MLX_MODELS[a.model]
     indian = INDIAN.get(a.lang or "")
     sarvam_key = os.environ.get("SARVAM_API_KEY", "").strip()
     if a.engine == "sarvam":
@@ -385,9 +454,12 @@ def main():
     video = Path(a.video).expanduser().resolve()
     if not video.exists():
         sys.exit(f"transcribe.py: no such file: {video}")
+    hinglish_path = a.script == "roman" and (a.lang or "") in ("hi", "ur")
+    a.whisper_lang = "hi" if hinglish_path else (indian[1] if indian else a.lang)
     t0 = time.time()
     digest = sha256(video)
-    key = hashlib.sha256(json.dumps([CACHE_VERSION, a.lang, a.vocab, a.script, a.model, a.engine]).encode()).hexdigest()[:10]
+    key = hashlib.sha256(json.dumps([CACHE_VERSION, a.backend, a.lang, a.vocab, a.script, a.model, a.engine,
+                                    a.vad, a.device, a.compute_type]).encode()).hexdigest()[:10]
     cdir = Path(a.cache_dir) / digest[:16]
     cdir.mkdir(parents=True, exist_ok=True)
     cached = cdir / f"words.{key}.json"
@@ -405,31 +477,19 @@ def main():
     wav = cdir / "audio.wav"
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(video), "-vn", "-ar", "16000", "-ac", "1", str(wav)], check=True)
 
-    try:
-        import mlx_whisper
-    except ImportError:
-        sys.exit("transcribe.py: mlx-whisper is not installed. Run this script with `uv run`, or `pip install mlx-whisper`.")
-
-    kwargs = dict(path_or_hf_repo=a.model, word_timestamps=True, condition_on_previous_text=False, verbose=None)
-    # Urdu in Latin letters is spoken like Hindi in Latin letters (Roman Urdu), so it takes the Hinglish path.
-    hinglish_path = a.script == "roman" and (a.lang or "") in ("hi", "ur")
-    whisper_lang = "hi" if hinglish_path else (indian[1] if indian else a.lang)
-    if whisper_lang:
-        kwargs["language"] = whisper_lang
     hints = []
     if hinglish_path and a.engine == "whisper":
         hints.append(ROMAN_HINT)  # with this hint Whisper writes most Hindi in Latin letters by itself
     if a.vocab.strip():
         hints.append("Vocabulary: " + a.vocab.strip().rstrip(".") + ".")
-    if hints:
-        kwargs["initial_prompt"] = " ".join(hints)
-    result = mlx_whisper.transcribe(str(wav), **kwargs)
+    segments, detected = (run_mlx if a.backend == "mlx" else run_faster)(wav, a, hints)
+    result = {"language": detected}
 
     words = []
-    for seg in result.get("segments", []):
+    for seg in segments:
         seg_words = 0
-        for w in seg.get("words", []) or []:
-            raw = w.get("word") or ""
+        for w in seg:
+            raw = w["word"]
             text = raw.strip()
             if not text:
                 continue
@@ -438,15 +498,15 @@ def main():
             if words and not raw.startswith(" ") and seg_words > 0 and re.match(r"^[\w,.'’%-]", text):
                 # Whisper split one word into two tokens ("25" + ",000"): glue it back together
                 words[-1]["text"] += text
-                words[-1]["endMs"] = int(round(float(w["end"]) * 1000))
+                words[-1]["endMs"] = int(round(w["end"] * 1000))
                 continue
             seg_words += 1
-            words.append({"text": text, "startMs": int(round(float(w["start"]) * 1000)), "endMs": int(round(float(w["end"]) * 1000)),
-                          "prob": round(float(w.get("probability", 0)), 3)})
+            words.append({"text": text, "startMs": int(round(w["start"] * 1000)), "endMs": int(round(w["end"] * 1000)),
+                          "prob": round(w["probability"], 3)})
     if a.engine == "sarvam" and words:
         words = sarvam_words(wav, words, sarvam_key, indian[2], a.script)
     data = {"version": 1, "source": {"sha256": digest, **meta}, "language": a.lang or result.get("language"), "model": a.model,
-            "engine": a.engine, "script": a.script, "words": words}
+            "engine": a.engine, "backend": a.backend, "script": a.script, "words": words}
     cached.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
     if out_path != cached:
         out_path.parent.mkdir(parents=True, exist_ok=True)

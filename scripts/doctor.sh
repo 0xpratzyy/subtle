@@ -16,20 +16,20 @@ os="$(uname -s)"; arch="$(uname -m)"
 if command -v ffmpeg >/dev/null 2>&1 && command -v ffprobe >/dev/null 2>&1; then
   ok ffmpeg "$(ffmpeg -version 2>/dev/null | head -1 | cut -d' ' -f1-3)"
 else
-  bad ffmpeg "install: brew install ffmpeg   (Linux: sudo apt install ffmpeg)"
+  bad ffmpeg "install: brew install ffmpeg | Linux: sudo apt install ffmpeg | Windows: winget install ffmpeg"
 fi
 
 if command -v python3 >/dev/null 2>&1; then
   ok python3 "$(python3 --version 2>&1)"
 else
-  bad python3 "install: brew install python"
+  bad python3 "install Python 3.9+ (Windows: winget install Python.Python.3.12)"
 fi
 
 if command -v node >/dev/null 2>&1; then
   major="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
-  if [ "$major" -ge 18 ]; then ok node "$(node --version)"; else bad node "Node 18 or newer is needed (found $(node --version)): brew install node"; fi
+  if [ "$major" -ge 18 ]; then ok node "$(node --version)"; else bad node "Node 18 or newer is needed (found $(node --version)): brew install node | winget install OpenJS.NodeJS.LTS"; fi
 else
-  bad node "install: brew install node"
+  bad node "install: brew install node | winget install OpenJS.NodeJS.LTS"
 fi
 
 # Verification and beat detection use inline dependency metadata with uv.
@@ -42,15 +42,15 @@ else
 fi
 
 if [ "${1:-}" = "--from-timings" ]; then
-  note mlx-whisper "skipped for supplied word timings"
-elif [ "$os" != "Darwin" ] || [ "$arch" != "arm64" ]; then
-  bad mlx-whisper "local transcription needs Apple Silicon macOS. Supply --words or --captions and run doctor with --from-timings."
+  note whisper "skipped for supplied word timings"
+elif [ "$os" = "Darwin" ] && [ "$arch" = "arm64" ] && python3 -c "import mlx_whisper" >/dev/null 2>&1; then
+  ok whisper "mlx-whisper importable (Apple Silicon; --backend faster also works)"
 elif command -v uv >/dev/null 2>&1; then
-  ok mlx-whisper "will run through uv; the first run downloads the model"
-elif python3 -c "import mlx_whisper" >/dev/null 2>&1; then
-  ok mlx-whisper "importable from python3"
+  ok whisper "faster-whisper will run through uv; the first run downloads the model (large-v3-turbo, ~1.6 GB; use --model small on a weak machine)"
+elif python3 -c "import faster_whisper" >/dev/null 2>&1; then
+  ok whisper "faster-whisper importable from python3"
 else
-  bad mlx-whisper "install uv or install mlx-whisper in your Python environment"
+  bad whisper "install uv (https://docs.astral.sh/uv/) or: pip install faster-whisper"
 fi
 
 # Renderer packages (installed on first render).
