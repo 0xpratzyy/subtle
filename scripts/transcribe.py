@@ -22,7 +22,7 @@ from pathlib import Path
 
 DEFAULT_MODEL = "mlx-community/whisper-large-v3-turbo"
 FASTER_MODEL = "large-v3-turbo"
-MLX_MODELS = {name: f"mlx-community/whisper-{name}" for name in ("tiny", "base", "small", "medium", "large-v3")}
+MLX_MODELS = {name: f"mlx-community/whisper-{name}-mlx" for name in ("tiny", "base", "small", "medium", "large-v3")}
 MLX_MODELS["large-v3-turbo"] = DEFAULT_MODEL
 CACHE_VERSION = 5  # bump when transcription or spelling logic changes, so old cache entries are not reused
 
@@ -410,7 +410,12 @@ def run_faster(wav, a, hints):
         kwargs["language"] = a.whisper_lang
     if hints:
         kwargs["initial_prompt"] = " ".join(hints)
-    segments, info = model.transcribe(str(wav), **kwargs)
+    # decode the 16 kHz mono WAV ourselves: faster-whisper's own decoder (PyAV) breaks with current PyAV releases
+    import numpy as np
+    raw = subprocess.run(["ffmpeg", "-v", "error", "-i", str(wav), "-f", "f32le", "-ac", "1", "-ar", "16000", "-"],
+                         capture_output=True, check=True).stdout
+    audio = np.frombuffer(raw, dtype=np.float32)
+    segments, info = model.transcribe(audio, **kwargs)
     normalized = [[{"word": w.word or "", "start": float(w.start), "end": float(w.end),
                     "probability": float(w.probability)} for w in (seg.words or [])] for seg in segments]
     return normalized, info.language or a.whisper_lang
