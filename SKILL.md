@@ -1,12 +1,13 @@
 ---
 name: subtle
-description: Transcribe and render animated captions or export SRT locally from video or audio. Use for word-by-word subtitles, highlighted keywords or prices, Hinglish captions, text behind a speaker, or beat-synced lyric videos. Includes 39 styles, editable word timings, and visual checks for the finished render.
+description: Transcribe and render animated captions or export SRT locally from video or audio. Use for word-by-word subtitles, highlighted keywords or prices, Hinglish captions, text behind a speaker, or beat-synced lyric videos. Includes 39 styles, editable word timings, and visual checks for the finished render. Supports OpenCode on Windows with faster-whisper.
 ---
 
 # Subtle: beautiful captions for any video
 
 You add animated captions to a video with the tools in this folder. Everything runs on the user's machine. Nothing is
 uploaded and no key is needed. Run commands from this skill's folder (the folder holding this file).
+OpenCode can load this folder as a skill. On Windows use `python` and PowerShell paths; on macOS/Linux use `python3` and `bash scripts/doctor.sh`.
 
 ## Inputs
 
@@ -27,25 +28,28 @@ uploaded and no key is needed. Run commands from this skill's folder (the folder
 | legibility | `auto` | `auto`: measure what is behind every page and add a soft halo, scrim or outline where the type would not read; clean dark footage is left untouched. `off`: draw the preset as it is |
 | palette | `auto` | `auto`: styles with an accent colour (`glide`, `keyword`, `shine`, `accent`, `hype`, `highlighter`, `haiku`, `karaoke`) take it from the footage: a colour that suits the scene and reads on it. `off`: the preset's colours |
 | aspect | `source` | `9:16`, `1:1`, `4:5`, `16:9` centre-crop the video first |
+| model | `large-v3-turbo` | `--model small` is faster on a slow CPU or a machine with 8 GB RAM |
+| backend | `auto` | `faster` for faster-whisper, or `mlx` for mlx-whisper on Apple Silicon |
+| device / compute type | `auto` | faster-whisper: `--device cpu|cuda`, `--compute-type int8|float16|float32`; `--vad` skips silence in speech (not singing) |
 
 If the user did not name a style, use `glide` and say which other styles exist. Ask nothing else up front.
 
 ## Steps
 
-1. **Check dependencies.** Run `bash scripts/doctor.sh`, adding `--from-timings` when using `--words` or `--captions`.
+1. **Check dependencies.** On Windows run `python scripts/doctor.py`; on macOS/Linux run `bash scripts/doctor.sh`. Add `--from-timings` when using `--words` or `--captions`.
    Resolve any dependencies required for the requested workflow before rendering.
-2. **Transcribe.** `python3 scripts/subtle.py "<video>" --stop-after transcribe [--lang ..] [--vocab ".."] [--hinglish]`
+2. **Transcribe.** `python scripts/subtle.py "<absolute-video-path>" --stop-after transcribe [--lang ..] [--vocab ".."] [--hinglish]` (use `python3` on macOS/Linux)
    It prints the transcript. Read it.
    - Fix wrong names with `--replace heard=Shown` (repeatable) or better `--vocab`.
    - For an Indian language (or Hinglish), check names and spelling against the audio. Flag uncertain words. If the
      user has a `SARVAM_API_KEY`, suggest `--engine sarvam` for noticeably better Indian and code-mixed text.
-3. **Group.** `python3 scripts/subtle.py "<video>" --style <style> --stop-after group`.
+3. **Group.** `python scripts/subtle.py "<absolute-video-path>" --style <style> --stop-after group` (use `python3` on macOS/Linux).
    Keep the transcription flags from step 2. For a song, pass the chosen music style and any supplied
    `--lyrics <file>` and `--canvas <ratio>`. For video, add the requested `--aspect` if needed.
    This writes `<name>.captions.json` and prints the words the rules highlighted. Spoken numbers are already single
    tokens here: "five thousand dollars" is `$5,000`, "forty percent" is `40%`, "one lakh rupees" is `₹1 lakh`.
 4. **Pick the highlights. This is your job, and it is what makes the captions good.**
-   `python3 scripts/emphasis.py "<name>.captions.json" --style <style> --show` prints every page with the highlighted
+   `python scripts/emphasis.py "<name>.captions.json" --style <style> --show` prints every page with the highlighted
    words in [brackets] and the reason for each. The rules find numbers and names; they cannot tell what matters.
    Read the pages and decide, in this order of priority:
    1. numbers, prices, percentages, dates and counts (`$5,000`, `3x`, `1991`, `40%`);
@@ -56,16 +60,15 @@ If the user did not name a style, use `glide` and say which other styles exist. 
    At most 1 highlight per page, 2 on pages of 5 words or more. Never filler words (`the`, `really`, `that's`).
    Remove the rule guesses that are not the point of their line. Then save your picks, each with a one-line reason:
    ```
-   python3 scripts/emphasis.py "<name>.captions.json" --style <style> \
-     --pick '21:25,000=the size of the hoard' --pick '38:broke=the turn of the story' --drop '34:smuggling'
+   python scripts/emphasis.py "<name>.captions.json" --style <style> --pick '21:25,000=the size of the hoard' --pick '38:broke=the turn of the story' --drop '34:smuggling'
    ```
    `PAGE:WORD` uses the page number and the word as `--show` prints them. Use single quotes, or the shell eats `$5`.
    `--clear` removes every highlight first if you would rather start from nothing.
-5. **Render.** `python3 scripts/subtle.py "<video>" --style <style> --captions "<name>.captions.json"`
+5. **Render.** `python scripts/subtle.py "<absolute-video-path>" --style <style> --captions "<name>.captions.json"` (use `python3` on macOS/Linux)
    Keep the same `--canvas` or `--aspect` as in step 3.
    The transcript is cached, so this does not transcribe again. The first render installs the renderer (about a minute).
    In a hurry, or running with no one to pick: skip steps 3 and 4 and render directly with
-   `python3 scripts/subtle.py "<video>" --style <style>`; the rules pick the highlights (`--emphasis auto`).
+   `python scripts/subtle.py "<absolute-video-path>" --style <style>` (use `python3` on macOS/Linux); the rules pick the highlights (`--emphasis auto`).
 6. **Verify.** The command prints JSON with `ok`, `warnings` and `preview` (a contact sheet). **Open the preview image
    and look at it** before you say anything. Check: text readable, inside the cyan safe-area box, not over the face,
    and the highlighted words are the ones that matter. Placement moves captions off the face and hands on its own; `notes` says
@@ -138,7 +141,7 @@ Music / lyric styles (pages start on the beat; use them for songs and for speech
 ## Editing by hand
 
 `<name>.captions.json` holds every page, word, line break, highlight (`emphasis`) and its `reason` (format:
-`docs/ARCHITECTURE.md`). Edit it, run `python3 scripts/emphasis.py <file> --style <style>` once so page holds and giant
+`docs/ARCHITECTURE.md`). Edit it, run `python scripts/emphasis.py <file> --style <style>` once (use `python3` on macOS/Linux) so page holds and giant
 words follow your edit, and re-render with `--captions <file>`. A style is one JSON file in `styles/`; copy one, change fonts, colours, size or
 timing, and pass its path to `--style`.
 

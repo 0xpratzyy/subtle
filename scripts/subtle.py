@@ -122,6 +122,11 @@ def main():
                     help="roman: an Indian language in Latin letters, the way people type it (Hinglish, Tanglish...)")
     ap.add_argument("--engine", choices=["whisper", "sarvam"], default="whisper",
                     help="sarvam: Sarvam AI writes the words for an Indian language (your own SARVAM_API_KEY; Whisper still times them)")
+    ap.add_argument("--model", help="speech model (default large-v3-turbo; use small on a slow CPU)")
+    ap.add_argument("--backend", choices=["auto", "faster", "mlx"], default="auto", help="auto uses mlx on Apple Silicon if installed; faster-whisper elsewhere")
+    ap.add_argument("--device", choices=["auto", "cpu", "cuda"], default="auto", help="faster-whisper device")
+    ap.add_argument("--compute-type", choices=["auto", "int8", "int8_float16", "float16", "float32"], default="auto")
+    ap.add_argument("--vad", action="store_true", help="faster-whisper: skip silence (speech only; not for singing)")
     ap.add_argument("--hinglish", action="store_true", help="short for --lang hi --script roman")
     ap.add_argument("--aspect", default="source", help="source (default), 9:16, 1:1, 4:5 or 16:9 (centre crop)")
     ap.add_argument("--max-words", type=int)
@@ -227,6 +232,11 @@ def main():
         shutil.copyfile(Path(a.words).expanduser(), words_path)
     else:
         cmd = py(HERE / "transcribe.py") + [src, "--out", words_path, "--script", a.script, "--engine", a.engine]
+        if a.model:
+            cmd += ["--model", a.model]
+        cmd += ["--backend", a.backend, "--device", a.device, "--compute-type", a.compute_type]
+        if a.vad:
+            cmd.append("--vad")
         if a.lang:
             cmd += ["--lang", a.lang]
         if a.vocab:
